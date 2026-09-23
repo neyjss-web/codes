@@ -1,0 +1,99 @@
+// Teste de ponta a ponta no Chromium: abre dist/PDFNotas.html via file://
+import { chromium } from 'playwright-core';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+
+const OUT = process.env.SHOTS || '/tmp/shots';
+mkdirSync(OUT, { recursive: true });
+const exe = [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'].filter(Boolean).find(existsSync);
+const browser = await chromium.launch({ executablePath: exe });
+const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
+const page = await ctx.newPage();
+const errors = [];
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+await page.goto(pathToFileURL(resolve('dist/PDFNotas.html')).href);
+await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');
+await page.waitForFunction(() => window.__pdfnotas.S.n === 40, null, { timeout: 30000 });
+await page.waitForTimeout(1500);
+const st = await page.evaluate(() => ({ n: window.__pdfnotas.S.annots.length, canWrite: window.__pdfnotas.S.canWrite }));
+console.log('anotações existentes:', st);
+await page.screenshot({ path: `${OUT}/1-grid.png` });
+
+// Zoom com teclas
+await page.keyboard.press('>');
+await page.keyboard.press('>');
+await page.waitForTimeout(800);
+console.log('zoom label após >>:', await page.textContent('#zoom-label'));
+await page.keyboard.press('<'); await page.keyboard.press('<'); await page.keyboard.press('<'); await page.keyboard.press('<');
+await page.waitForTimeout(800);
+console.log('zoom label após <<<<:', await page.textContent('#zoom-label'));
+await page.screenshot({ path: `${OUT}/2-small.png` });
+
+// Seleção de intervalo e marcação em grupo
+await page.fill('#sel-range', '15-24');
+await page.press('#sel-range', 'Enter');
+console.log('seleção:', await page.textContent('#sel-info'));
+await page.click('#mark-group');
+await page.fill('#group-dialog [name=label]', 'Contestação');
+await page.fill('#group-dialog [name=text]', 'Contestação do réu (fls. 15–24)');
+await page.click('#gd-ok');
+await page.waitForTimeout(500);
+console.log('grupos:', await page.evaluate(() => window.__pdfnotas.S.groups.map((g) => [g.label, g.pages.length])));
+
+// Hover: lupa
+await page.hover('.page[data-i="16"]');
+await page.waitForTimeout(1200);
+console.log('lupa visível:', await page.isVisible('#preview'));
+await page.screenshot({ path: `${OUT}/3-hover.png` });
+
+// Editor: realce por seleção de texto e nota
+await page.mouse.move(5, 5);
+await page.dblclick('.page[data-i="2"]');
+await page.waitForSelector('.textLayer span', { timeout: 10000 });
+await page.keyboard.press('h');
+const span = page.locator('.textLayer span').nth(3);
+const box = await span.boundingBox();
+await page.mouse.move(box.x + 2, box.y + box.height / 2);
+await page.mouse.down();
+await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 5 });
+await page.mouse.up();
+await page.waitForTimeout(300);
+await page.keyboard.press('n');
+const ep = await page.locator('.epage').boundingBox();
+await page.mouse.click(ep.x + ep.width - 80, ep.y + 200);
+await page.keyboard.type('Nota criada no teste — ação');
+await page.waitForTimeout(300);
+await page.screenshot({ path: `${OUT}/4-editor.png` });
+await page.keyboard.press('Escape'); // sai do campo
+await page.keyboard.press('Escape'); // desmarca
+await page.keyboard.press('Escape'); // fecha
+console.log('editor aberto?', await page.isVisible('#editor'));
+const annots = await page.evaluate(() => window.__pdfnotas.S.annots.map((a) => [a.type, a.page, a.contents]));
+console.log('total anotações:', annots.length, annots.filter((a) => !String(a[2]).startsWith('Contesta')));
+
+// Exporta FDF
+const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export-fdf')]);
+const fdfPath = `${OUT}/export.fdf`;
+await dl.saveAs(fdfPath);
+console.log('FDF:', readFileSync(fdfPath, 'latin1').slice(0, 120).replace(/\n/g, ' | '));
+
+// Salva PDF
+const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('#save-pdf')]);
+const pdfPath = `${OUT}/salvo.pdf`;
+await dl2.saveAs(pdfPath);
+
+// Reabre o PDF salvo e importa o FDF (mescla)
+await page.setInputFiles('#open-pdf', pdfPath);
+await page.waitForFunction(() => window.__pdfnotas.S.fileName === 'salvo.pdf' && document.querySelector('#progress').hidden, null, { timeout: 30000 }).catch(async (e) => { console.log(await page.evaluate(() => [window.__pdfnotas.S.fileName, document.querySelector("#progress").hidden, document.querySelector("#progress span").textContent])); console.log(errors); throw e; });
+console.log('reaberto: anotações lidas do PDF salvo =', await page.evaluate(() => window.__pdfnotas.S.annots.length), 'grupos =', await page.evaluate(() => window.__pdfnotas.S.groups.map((g) => [g.label, g.pages.length])));
+page.once('dialog', (d) => d.accept());
+await page.setInputFiles('#import-fdf', fdfPath);
+await page.waitForSelector('#choice-dialog[open]');
+await page.click('#choice-actions button[value=replace]');
+await page.waitForTimeout(500);
+console.log('após importar FDF (substituir):', await page.evaluate(() => window.__pdfnotas.S.annots.length));
+await page.screenshot({ path: `${OUT}/5-reimport.png` });
+console.log('erros/avisos do console:', errors.slice(0, 15));
+await browser.close();

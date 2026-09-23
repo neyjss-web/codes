@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Notas</title>
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<header id="toolbar">
+  <div class="brand" title="PDF Notas — comentários em PDF com FDF">📑 <b>PDF Notas</b></div>
+  <div class="tb-group">
+    <label class="btn primary" title="Abrir PDF (Ctrl+O)">Abrir PDF<input type="file" id="open-pdf" accept="application/pdf,.pdf" hidden></label>
+    <button class="btn" id="save-pdf" disabled title="Salvar uma cópia do PDF com os comentários (Ctrl+S)">Salvar PDF</button>
+  </div>
+  <div class="tb-group">
+    <label class="btn" id="import-fdf-btn" title="Importar comentários de um arquivo FDF">Importar FDF<input type="file" id="import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
+    <button class="btn" id="export-fdf" disabled title="Exportar todos os comentários para FDF">Exportar FDF</button>
+  </div>
+  <div class="tb-group zoom" title="Tamanho das páginas: teclas &lt; e &gt;">
+    <button class="btn icon" id="zoom-out" aria-label="Diminuir páginas">&lt;</button>
+    <span id="zoom-label">—</span>
+    <button class="btn icon" id="zoom-in" aria-label="Aumentar páginas">&gt;</button>
+  </div>
+  <div class="tb-group search">
+    <input type="search" id="search" placeholder="Buscar no texto…" disabled>
+    <span id="search-info"></span>
+  </div>
+  <div class="tb-group grow"></div>
+  <div class="tb-group">
+    <label class="chk" title="Ampliar a página sob o cursor (tecla L)"><input type="checkbox" id="hover-zoom" checked> Lupa</label>
+    <label class="author" title="Autor usado nos novos comentários">Autor <input type="text" id="author" placeholder="seu nome"></label>
+    <button class="btn icon" id="toggle-side" title="Mostrar/ocultar painel de comentários">☰</button>
+    <button class="btn icon" id="help-btn" title="Atalhos e ajuda (F1)">?</button>
+  </div>
+</header>
+
+<div id="selbar" hidden>
+  <span id="sel-info"></span>
+  <input type="text" id="sel-range" placeholder="ex.: 1-30, 45, 50-" title="Selecionar por intervalo e pressionar Enter">
+  <button class="btn primary" id="mark-group">Marcar seleção com comentário…</button>
+  <button class="btn" id="sel-all">Todas</button>
+  <button class="btn" id="sel-search" hidden>Páginas da busca</button>
+  <button class="btn" id="sel-clear">Limpar (Esc)</button>
+</div>
+
+<main id="main">
+  <section id="viewer" tabindex="-1">
+    <div id="empty">
+      <div class="drop">
+        <h1>Arraste um PDF para cá</h1>
+        <p>ou use <b>Abrir PDF</b>. Depois, importe/exporte comentários em <b>FDF</b>.</p>
+        <ul>
+          <li><kbd>&lt;</kbd> <kbd>&gt;</kbd> diminuem/aumentam as páginas na tela</li>
+          <li>Passe o cursor sobre uma página para ampliá-la e destacar os comentários</li>
+          <li>Clique nas páginas para selecioná-las (<kbd>Shift</kbd>+clique seleciona um intervalo) e marque todas com um comentário único</li>
+          <li>Clique duplo abre a página para ler o texto e comentar</li>
+        </ul>
+      </div>
+    </div>
+    <div id="grid"></div>
+  </section>
+  <aside id="side">
+    <div class="side-head">
+      <input type="search" id="filter" placeholder="Filtrar comentários…">
+    </div>
+    <div class="side-body">
+      <h3>Marcações de páginas <span id="groups-count" class="count"></span></h3>
+      <div id="groups-list" class="list"></div>
+      <h3>Comentários <span id="annots-count" class="count"></span></h3>
+      <div id="annots-list" class="list"></div>
+    </div>
+  </aside>
+</main>
+
+<div id="preview" hidden>
+  <div class="pv-head"></div>
+  <div class="pv-page"><canvas></canvas></div>
+  <ol class="pv-list"></ol>
+</div>
+
+<div id="editor" hidden>
+  <div class="ed-tools">
+    <button class="tool" data-tool="select" title="Selecionar / mover (V)">🖱<span>Selecionar</span></button>
+    <button class="tool" data-tool="Text" title="Nota (N)">🗨<span>Nota</span></button>
+    <button class="tool" data-tool="FreeText" title="Texto livre (T)">T<span>Texto</span></button>
+    <button class="tool" data-tool="Highlight" title="Realçar texto (H)">🖍<span>Realçar</span></button>
+    <button class="tool" data-tool="Underline" title="Sublinhar (U)">U̲<span>Sublinhar</span></button>
+    <button class="tool" data-tool="StrikeOut" title="Tachar (K)">S̶<span>Tachar</span></button>
+    <button class="tool" data-tool="Square" title="Retângulo (R)">▭<span>Retângulo</span></button>
+    <button class="tool" data-tool="Circle" title="Elipse (E)">◯<span>Elipse</span></button>
+    <button class="tool" data-tool="Ink" title="Desenho livre (D)">✎<span>Desenho</span></button>
+    <input type="color" id="tool-color" title="Cor da nova anotação" value="#ffd400">
+  </div>
+  <div class="ed-center">
+    <div class="ed-bar">
+      <button class="btn icon" id="ed-prev" title="Página anterior (PageUp)">◀</button>
+      <span id="ed-pageno"></span>
+      <button class="btn icon" id="ed-next" title="Próxima página (PageDown)">▶</button>
+      <span class="sep"></span>
+      <button class="btn icon" id="ed-zoom-out" title="Reduzir (&lt;)">−</button>
+      <span id="ed-zoom"></span>
+      <button class="btn icon" id="ed-zoom-in" title="Ampliar (&gt;)">+</button>
+      <span class="sep"></span>
+      <button class="btn" id="ed-copy-text" title="Copiar o texto da página">Copiar texto</button>
+      <span class="grow"></span>
+      <button class="btn" id="ed-close" title="Fechar (Esc)">Fechar ✕</button>
+    </div>
+    <div class="ed-scroll"><div class="epage"></div></div>
+  </div>
+  <div class="ed-side">
+    <h3>Comentários da página</h3>
+    <div id="ed-list" class="list"></div>
+    <form id="props" hidden autocomplete="off">
+      <h3 id="props-title">Propriedades</h3>
+      <label>Comentário<textarea name="contents" rows="5"></textarea></label>
+      <label>Autor<input name="author"></label>
+      <label>Assunto<input name="subject"></label>
+      <div class="row">
+        <label>Cor<input type="color" name="color"></label>
+        <label data-for="FreeText">Fonte<input type="number" name="fontSize" min="4" max="96" step="1"></label>
+        <label data-for="Square Circle Ink Line FreeText">Borda<input type="number" name="borderWidth" min="0" max="20" step="0.5"></label>
+        <label>Opacidade<input type="range" name="opacity" min="0.1" max="1" step="0.05"></label>
+      </div>
+      <p class="meta" id="props-meta"></p>
+      <button type="button" class="btn danger" id="props-delete">Excluir comentário (Del)</button>
+    </form>
+  </div>
+</div>
+
+<dialog id="group-dialog">
+  <form method="dialog">
+    <h2 id="gd-title">Marcar páginas com comentário único</h2>
+    <label>Rótulo
+      <input name="label" required placeholder="ex.: Contestação" list="label-presets">
+    </label>
+    <div class="chips" id="label-chips"></div>
+    <label>Comentário
+      <textarea name="text" rows="4" placeholder="Texto que aparecerá em todas as páginas marcadas"></textarea>
+    </label>
+    <label>Páginas <input name="pages" placeholder="ex.: 1-30, 45"></label>
+    <div class="row">
+      <label>Cor <input type="color" name="color" value="#d62828"></label>
+      <div class="swatches" id="swatches"></div>
+    </div>
+    <label class="chk"><input type="checkbox" name="frame" checked> Moldura colorida em volta das páginas</label>
+    <label class="chk"><input type="checkbox" name="corner"> Nota no canto superior direito (em vez do esquerdo)</label>
+    <p class="hint" id="gd-hint"></p>
+    <div class="actions">
+      <button value="cancel" class="btn">Cancelar</button>
+      <button value="ok" class="btn primary" id="gd-ok">Aplicar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="choice-dialog">
+  <form method="dialog">
+    <p id="choice-msg"></p>
+    <div class="actions" id="choice-actions"></div>
+  </form>
+</dialog>
+
+<dialog id="help-dialog">
+  <form method="dialog">
+    <h2>Atalhos</h2>
+    <table>
+      <tr><td><kbd>&lt;</kbd> / <kbd>&gt;</kbd></td><td>Páginas menores (cabem mais) / maiores (cabem menos). Também <kbd>-</kbd> <kbd>+</kbd></td></tr>
+      <tr><td>Clique</td><td>Seleciona/desmarca a página</td></tr>
+      <tr><td><kbd>Shift</kbd>+clique</td><td>Seleciona um intervalo de páginas</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Esc</kbd></td><td>Seleciona todas / limpa a seleção</td></tr>
+      <tr><td><kbd>M</kbd></td><td>Marcar as páginas selecionadas com comentário único</td></tr>
+      <tr><td>Clique duplo</td><td>Abre a página para leitura e comentários</td></tr>
+      <tr><td><kbd>L</kbd></td><td>Liga/desliga a lupa ao passar o cursor</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Buscar no texto</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfazer / refazer</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Salvar PDF com comentários</td></tr>
+      <tr><td colspan="2"><b>Na página aberta</b></td></tr>
+      <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
+      <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Página anterior / próxima</td></tr>
+      <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>
+    </table>
+    <p class="hint">Realçar/Sublinhar/Tachar: selecione o texto com a ferramenta ativa, ou arraste um retângulo em áreas sem texto.
+      As marcações de grupo são gravadas como notas padrão do PDF (com moldura opcional) e exportadas no FDF com identificador
+      <code>grp-…</code>, o que permite reimportá-las como grupo.</p>
+    <div class="actions"><button class="btn primary" value="ok">OK</button></div>
+  </form>
+</dialog>
+
+<datalist id="label-presets"></datalist>
+<div id="toasts"></div>
+<div id="progress" hidden><div class="bar"></div><span></span></div>
+<script type="module">/*__JS__*/</script>
+</body>
+</html>

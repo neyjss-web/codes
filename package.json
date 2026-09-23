@@ -1,0 +1,33 @@
+{
+  "name": "pdf-notas",
+  "version": "1.0.0",
+  "description": "Leitor de PDF com edição de comentários e importação/exportação FDF",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --serve",
+    "test": "node --test test/*.test.mjs",
+    "build:win": "node build.mjs --win",
+    "test:e2e": "node test/e2e.mjs",
+    "sample": "node samples/make-sample.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neyjss-web/codes.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/neyjss-web/codes/issues"
+  },
+  "homepage": "https://github.com/neyjss-web/codes#readme",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.56.1"
+  },
+  "type": "module",
+  "private": true
+}
