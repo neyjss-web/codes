@@ -5,8 +5,9 @@ Roda no Windows **sem instalação**.
 
 ## Como usar no Windows
 
-1. Baixe `dist/PDFNotas.exe`. É um arquivo único (~10 MB) e portátil, que pode ficar numa pasta, na área de trabalho ou num pendrive.
-2. Dê um clique duplo. O app abre numa janela própria do Microsoft Edge, que já vem no Windows 10 e 11.
+1. Baixe `dist/PDFNotas.exe`. É um arquivo único (~9 MB) e portátil, que pode ficar numa pasta, na área de trabalho ou num pendrive.
+   Ele é de 32 bits e roda em Windows 7, 8, 10 e 11, de 32 ou 64 bits.
+2. Dê um clique duplo. O app abre numa janela própria do Microsoft Edge, que já vem no Windows 10 e 11. No Windows 7/8, é preciso ter o Edge ou o Chrome instalado.
    - Se preferir, **arraste um PDF sobre o `PDFNotas.exe`** ou use *Abrir com → PDFNotas.exe*. O PDF abre direto.
    - Na primeira execução, o Windows SmartScreen pode avisar que o programa não é assinado. Clique em *Mais informações → Executar assim mesmo*.
 3. Outra opção é abrir `dist/PDFNotas.html` com clique duplo no Edge ou no Chrome. É o mesmo app em um único arquivo HTML e funciona offline.
@@ -40,7 +41,7 @@ Requer Node.js 20+ (e Go 1.21+ apenas para gerar o `.exe`).
 npm install
 npm test            # testes de FDF, gravação/leitura no PDF e intervalos de páginas
 npm run build       # gera dist/PDFNotas.html (arquivo único)
-npm run build:win   # gera também dist/PDFNotas.exe (Windows x64, portátil)
+npm run build:win   # gera também dist/PDFNotas.exe (Windows 32 bits, portátil; usa Go 1.20 via GOTOOLCHAIN)
 npm run dev         # build + servidor em http://localhost:8080
 npm run test:e2e    # teste de ponta a ponta no Chromium (CHROME_PATH=/caminho/do/chrome)
 ```

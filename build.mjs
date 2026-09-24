@@ -51,7 +51,9 @@ async function run() {
   if (process.argv.includes('--win')) buildWindowsExe();
 }
 
-// Gera dist/PDFNotas.exe (Windows 64 bits, portátil) com o HTML embutido. Requer Go >= 1.21.
+// Gera dist/PDFNotas.exe (Windows 32 bits, portátil) com o HTML embutido.
+// 32 bits roda em qualquer Windows (32 e 64 bits, e ARM por emulação). O Go 1.20 é a última
+// versão que mantém compatibilidade com Windows 7/8; é obtido automaticamente via GOTOOLCHAIN.
 function buildWindowsExe() {
   const launcher = join(root, 'launcher');
   copyFileSync(outFile, join(launcher, 'PDFNotas.html'));
@@ -59,7 +61,7 @@ function buildWindowsExe() {
   execFileSync('go', ['build', '-trimpath', '-ldflags', '-s -w -H windowsgui', '-o', exe, '.'], {
     cwd: launcher,
     stdio: 'inherit',
-    env: { ...process.env, GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0' },
+    env: { ...process.env, GOOS: 'windows', GOARCH: '386', CGO_ENABLED: '0', GOTOOLCHAIN: process.env.GOTOOLCHAIN || 'go1.20.14' },
   });
   console.log(`Gerado ${exe} (${(statSync(exe).size / 1048576).toFixed(1)} MB)`);
 }
