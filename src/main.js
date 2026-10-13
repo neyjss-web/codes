@@ -63,6 +63,7 @@ const S = {
   trailerId: null,
   gen: 0,
   text: new Map(),
+  links: new Map(),
   matches: new Set(),
   searchTerm: '',
   undo: [],
@@ -218,7 +219,7 @@ async function openPdf(file) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), matches: new Set(), searchTerm: '',
+      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
@@ -298,6 +299,8 @@ function applyZoomVar() {
   grid.style.setProperty('--pw', pw + 'px');
   const avail = viewer.clientWidth - 28;
   const perRow = Math.max(1, Math.floor((avail + 12) / (pw + 12)));
+  // Links clicáveis na grade apenas quando as páginas estão grandes o bastante para leitura
+  grid.classList.toggle('links-on', pw >= 300);
   $('#zoom-label').textContent = S.n ? `${perRow} por linha` : `${pw}px`;
 }
 
@@ -378,6 +381,12 @@ async function renderThumb(i, targetW) {
     const old = $('canvas.pg', el);
     if (old) old.replaceWith(canvas); else el.prepend(canvas);
     st.w = targetW;
+    if (!el.dataset.links) {
+      el.dataset.links = '1';
+      getLinks(i).then((links) => {
+        if (links.length && gen === S.gen && !$('.links', el)) el.insertBefore(buildLinkLayer(i, links), $('svg.ann', el) || $('.tags', el));
+      });
+    }
   } catch (e) {
     if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao renderizar página', i + 1, e);
   } finally {
@@ -831,10 +840,10 @@ function annotItem(a, withPage) {
     ${a.contents ? `<div class="c">${esc(a.contents)}</div>` : ''}`;
   it.onclick = (e) => {
     if (e.target.closest('button')?.dataset.act === 'del') { deleteAnnot(a.id); return; }
-    if (E.open) { if (E.i !== a.page) openEditor(a.page, a.id); else selectAnnot(a.id); }
+    if (E.open) revealAnnot(a.id);
     else scrollToPage(a.page);
   };
-  it.ondblclick = () => openEditor(a.page, a.id);
+  it.ondblclick = () => { if (!E.open) openEditor(a.page, a.id); };
   return it;
 }
 
@@ -954,75 +963,109 @@ $('#hover-zoom').onchange = (e) => {
 };
 
 // ============================================================================
-// Editor de página (leitura do texto e criação/edição de comentários)
+// Leitura contínua: todas as páginas em rolagem sequencial, com texto
+// selecionável, hiperlinks e criação/edição de comentários
 // ============================================================================
 
 const E = {
-  open: false, i: 0, scale: 1.5, fit: true, tool: 'select', selId: null, vp: null,
-  renderTask: null, textLayer: null, drag: null, pendingSnap: null,
+  open: false, i: 0, scale: 1.5, fit: true, tool: 'select', selId: null,
+  drag: null, pendingSnap: null, pages: new Map(), io: null, gen: 0,
 };
-const epage = $('#editor .epage');
+const escroll = $('#editor .ed-scroll');
+const epages = $('#editor .epages');
 const MARKUP = ['Highlight', 'Underline', 'StrikeOut'];
 const DRAW = ['Text', 'FreeText', 'Square', 'Circle', 'Ink'];
+
+const evp = (i) => S.vps[i].clone({ scale: E.scale });
+const epageEl = (i) => epages.children[i];
 
 function openEditor(i, selId = null) {
   hidePreview();
   E.open = true;
-  E.i = i;
   E.selId = selId;
   $('#editor').hidden = false;
   setTool(E.tool);
-  renderEditor();
+  buildEditorPages(i, 0);
+  if (selId) revealAnnot(selId);
+  escroll.focus({ preventScroll: true });
 }
 
 function closeEditor() {
   E.open = false;
-  E.renderTask?.cancel();
+  resetEditorPages();
   $('#editor').hidden = true;
-  epage.innerHTML = '';
   renderSideSoon();
   scrollToPage(E.i, false);
   viewer.focus();
 }
 
-async function renderEditor() {
-  const i = E.i;
-  const vp1 = S.vps[i];
-  const scroller = $('#editor .ed-scroll');
-  if (E.fit) E.scale = Math.max(0.3, Math.min(3, (scroller.clientWidth - 40) / vp1.width));
-  const page = await S.pdf.getPage(i + 1);
-  if (!E.open || E.i !== i) return;
-  const vp = page.getViewport({ scale: E.scale });
-  E.vp = vp;
-  $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
+function resetEditorPages() {
+  E.gen++;
+  E.io?.disconnect();
+  for (const st of E.pages.values()) st.task?.cancel();
+  E.pages.clear();
+  epages.innerHTML = '';
+}
+
+// Cria os espaços de todas as páginas; o conteúdo é renderizado sob demanda.
+function buildEditorPages(anchor, ratio = 0) {
+  resetEditorPages();
+  if (E.fit) E.scale = Math.max(0.3, Math.min(3, (escroll.clientWidth - 48) / S.vps[anchor].width));
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < S.n; i++) {
+    const el = document.createElement('div');
+    el.className = 'epage';
+    el.dataset.i = i;
+    el.style.width = `${Math.round(S.vps[i].width * E.scale)}px`;
+    el.style.height = `${Math.round(S.vps[i].height * E.scale)}px`;
+    el.innerHTML = `<span class="epno">${i + 1}</span>`;
+    frag.append(el);
+  }
+  epages.append(frag);
+  E.io = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      const i = +en.target.dataset.i;
+      if (en.isIntersecting) renderEPage(i); else releaseEPage(i);
+    }
+  }, { root: escroll, rootMargin: '1200px 0px' });
+  for (const el of epages.children) E.io.observe(el);
+  const el = epageEl(anchor);
+  escroll.scrollTop = el.offsetTop - 12 + ratio * el.offsetHeight;
   $('#ed-zoom').textContent = `${Math.round(E.scale * 100)}%`;
-  $('#ed-prev').disabled = i === 0;
-  $('#ed-next').disabled = i === S.n - 1;
-  E.renderTask?.cancel();
-  E.textLayer?.cancel?.();
-  epage.innerHTML = '';
-  epage.style.width = `${vp.width}px`;
-  epage.style.height = `${vp.height}px`;
+  setCurrentPage(anchor, true);
+  updateToolUI();
+  renderEditorList();
+  renderProps();
+}
+
+async function renderEPage(i) {
+  if (E.pages.has(i)) return;
+  const gen = E.gen;
+  const st = { vp: evp(i) };
+  E.pages.set(i, st);
+  const el = epageEl(i);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(vp.width * DPR());
-  canvas.height = Math.round(vp.height * DPR());
-  epage.append(canvas);
+  canvas.width = Math.round(st.vp.width * DPR());
+  canvas.height = Math.round(st.vp.height * DPR());
   const tl = document.createElement('div');
   tl.className = 'textLayer';
   tl.style.setProperty('--total-scale-factor', E.scale);
-  epage.append(tl);
   const draw = document.createElement('div');
   draw.className = 'draw';
-  epage.append(draw);
-  renderEditorOverlay();
-  updateToolUI();
-  const task = page.render({ canvas, viewport: page.getViewport({ scale: E.scale * DPR() }) });
-  E.renderTask = task;
-  try { await task.promise; } catch (e) { if (e?.name !== 'RenderingCancelledException') console.warn(e); return; }
-  if (!E.open || E.i !== i) return;
+  el.innerHTML = `<span class="epno">${i + 1}</span>`;
+  el.prepend(canvas, tl);
+  el.append(draw);
+  renderEPageOverlay(i);
   try {
-    const textLayer = new pdfjsLib.TextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: vp });
-    E.textLayer = textLayer;
+    const page = await S.pdf.getPage(i + 1);
+    if (gen !== E.gen || E.pages.get(i) !== st) return;
+    st.task = page.render({ canvas, viewport: page.getViewport({ scale: E.scale * DPR() }) });
+    await st.task.promise;
+    if (gen !== E.gen || E.pages.get(i) !== st) return;
+    const links = await getLinks(i);
+    if (gen !== E.gen || E.pages.get(i) !== st) return;
+    if (links.length) el.insertBefore(buildLinkLayer(i, links), $('svg.ann', el));
+    const textLayer = new pdfjsLib.TextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: st.vp });
     await textLayer.render();
     if (S.searchTerm) {
       const t = normNoSpace(S.searchTerm);
@@ -1031,24 +1074,223 @@ async function renderEditor() {
         if (s && (s.includes(t) || (t.includes(s) && s.length > 3))) span.classList.add('hit');
       }
     }
-  } catch (e) { console.warn('Camada de texto indisponível', e); }
+  } catch (e) {
+    if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao exibir página', i + 1, e);
+  }
 }
 
+function releaseEPage(i) {
+  // Libera memória das páginas distantes
+  if (E.pages.size < 16 || E.drag?.i === i) return;
+  const st = E.pages.get(i);
+  if (!st) return;
+  st.task?.cancel();
+  E.pages.delete(i);
+  epageEl(i).innerHTML = `<span class="epno">${i + 1}</span>`;
+}
+
+function renderEPageOverlay(i) {
+  const el = epageEl(i);
+  if (!el || !E.pages.has(i)) return;
+  $('svg.ann', el)?.remove();
+  const svg = buildAnnotSvg(i, { interactive: true, selectedId: E.selId, scale: E.scale });
+  const draw = $('.draw', el);
+  if (draw) el.insertBefore(svg, draw); else el.append(svg);
+}
+
+// Atualiza as camadas de anotação, a lista lateral e o formulário
 function renderEditorOverlay() {
   if (!E.open) return;
-  $('svg.ann', epage)?.remove();
-  const svg = buildAnnotSvg(E.i, { interactive: true, selectedId: E.selId, scale: E.scale });
-  const draw = $('.draw', epage);
-  epage.insertBefore(svg, draw);
-  // Lista lateral
-  const list = $('#ed-list');
-  list.innerHTML = '';
-  const items = annotsOfPage(E.i).filter((a) => !a.frame).sort((a, b) => b.rect[3] - a.rect[3]);
-  if (!items.length) list.innerHTML = '<div class="empty-note">Nenhum comentário nesta página. Escolha uma ferramenta à esquerda.</div>';
-  for (const a of items) list.append(annotItem(a, false));
+  for (const i of E.pages.keys()) renderEPageOverlay(i);
+  renderEditorList();
   renderProps();
 }
 
+// Página atual = a que ocupa a parte superior da área visível
+let curRaf = 0;
+escroll.addEventListener('scroll', () => {
+  if (curRaf) return;
+  curRaf = requestAnimationFrame(() => {
+    curRaf = 0;
+    if (!E.open || !S.n) return;
+    const y = escroll.scrollTop + escroll.clientHeight * 0.3;
+    let lo = 0, hi = S.n - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (epageEl(mid).offsetTop <= y) lo = mid; else hi = mid - 1;
+    }
+    setCurrentPage(lo);
+  });
+}, { passive: true });
+
+function setCurrentPage(i, force = false) {
+  if (!force && i === E.i) return;
+  E.i = i;
+  $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
+  $('#ed-prev').disabled = i === 0;
+  $('#ed-next').disabled = i === S.n - 1;
+  for (const h of $$('#ed-list .pg-h.cur')) h.classList.remove('cur');
+  $(`#ed-list .pg-h[data-p="${i}"]`)?.classList.add('cur');
+}
+
+function gotoEditorPage(i, yOffset = 0, smooth = false) {
+  if (i < 0 || i >= S.n) return;
+  const el = epageEl(i);
+  escroll.scrollTo({ top: el.offsetTop - 12 + yOffset, behavior: smooth ? 'smooth' : 'auto' });
+  setCurrentPage(i, true);
+}
+
+function zoomEditor(f) {
+  E.fit = false;
+  E.scale = Math.max(0.25, Math.min(6, E.scale * f));
+  rebuildEditorKeepingPosition();
+}
+
+function rebuildEditorKeepingPosition() {
+  const el = epageEl(E.i);
+  const ratio = el ? (escroll.scrollTop + 12 - el.offsetTop) / el.offsetHeight : 0;
+  buildEditorPages(E.i, ratio);
+}
+
+// Seleciona um comentário e rola até ele
+function revealAnnot(id) {
+  const a = S.annots.find((x) => x.id === id);
+  if (!a) return;
+  E.selId = id;
+  const r = dispRect(evp(a.page), a.rect);
+  const visTop = escroll.scrollTop, visBot = visTop + escroll.clientHeight;
+  const absTop = epageEl(a.page).offsetTop + r[1];
+  if (absTop < visTop + 40 || absTop > visBot - 80) gotoEditorPage(a.page, Math.max(0, r[1] - 120));
+  else setCurrentPage(a.page, true);
+  renderEditorOverlay();
+}
+
+// ---- Lista de todos os comentários do arquivo ----
+let edListTimer = null;
+function renderEditorListSoon() {
+  clearTimeout(edListTimer);
+  edListTimer = setTimeout(renderEditorList, 200);
+}
+
+function renderEditorList() {
+  if (!E.open) return;
+  const list = $('#ed-list');
+  const q = norm($('#ed-filter').value.trim());
+  const match = (...xs) => !q || xs.some((x) => norm(x).includes(q));
+  list.innerHTML = '';
+  const groups = S.groups.filter((g) => match(g.label, g.text, g.author));
+  if (groups.length) {
+    list.insertAdjacentHTML('beforeend', '<div class="pg-h">Marcações de páginas</div>');
+    for (const g of groups) {
+      const it = document.createElement('div');
+      it.className = 'item';
+      it.innerHTML = `<span class="dot" style="background:${rgbCss(g.color)}"></span>
+        <span class="t"><b>${esc(g.label || 'Marcação')}</b> · ${g.pages.length} pág. · ${esc(truncate(formatPageRanges(g.pages), 40))}</span><span></span>
+        ${g.text && g.text !== g.label ? `<div class="c">${esc(g.text)}</div>` : ''}`;
+      // Clique: salta para a próxima página da marcação a partir da atual
+      it.onclick = () => gotoEditorPage(g.pages.find((p) => p > E.i) ?? g.pages[0], 0, true);
+      list.append(it);
+    }
+  }
+  const items = S.annots.filter((a) => !a.group && match(a.contents, a.author, a.subject, TYPE_LABELS[a.type]))
+    .sort((a, b) => a.page - b.page || b.rect[3] - a.rect[3]);
+  const total = S.annots.filter((a) => !a.group).length;
+  $('#ed-count').textContent = total ? `(${total})` : '';
+  if (!items.length) {
+    list.insertAdjacentHTML('beforeend', `<div class="empty-note">${total ? 'Nenhum comentário corresponde ao filtro.' : 'Nenhum comentário no arquivo. Escolha uma ferramenta à esquerda e clique na página.'}</div>`);
+  }
+  const LIMIT = 800;
+  let last = -1;
+  for (const a of items.slice(0, LIMIT)) {
+    if (a.page !== last) {
+      last = a.page;
+      const h = document.createElement('div');
+      h.className = 'pg-h' + (a.page === E.i ? ' cur' : '');
+      h.dataset.p = a.page;
+      h.textContent = `Página ${a.page + 1}`;
+      h.onclick = () => gotoEditorPage(a.page, 0, true);
+      list.append(h);
+    }
+    list.append(annotItem(a, false));
+  }
+  if (items.length > LIMIT) list.insertAdjacentHTML('beforeend', `<div class="empty-note">… e mais ${items.length - LIMIT}. Use o filtro.</div>`);
+  $('#ed-list .item.active')?.scrollIntoView({ block: 'nearest' });
+}
+$('#ed-filter').addEventListener('input', renderEditorListSoon);
+
+// ---- Hiperlinks do PDF ----
+async function getLinks(i) {
+  if (S.links.has(i)) return S.links.get(i);
+  let links = [];
+  try {
+    const page = await S.pdf.getPage(i + 1);
+    const anns = await page.getAnnotations({ intent: 'display' });
+    links = anns.filter((a) => a.subtype === 'Link' && (a.url || a.dest || a.action))
+      .map((a) => ({ rect: a.rect, url: a.url || null, dest: a.dest ?? null, action: a.action || null }));
+  } catch (e) { console.warn('Links indisponíveis na página', i + 1, e); }
+  S.links.set(i, links);
+  return links;
+}
+
+// Camada de links em porcentagem da página (serve para qualquer tamanho de exibição)
+function buildLinkLayer(i, links) {
+  const vp = S.vps[i];
+  const layer = document.createElement('div');
+  layer.className = 'links';
+  for (const l of links) {
+    const [x1, y1, x2, y2] = dispRect(vp, l.rect);
+    const a = document.createElement('a');
+    a.className = 'lnk';
+    a.style.cssText = `left:${(x1 / vp.width) * 100}%;top:${(y1 / vp.height) * 100}%;width:${((x2 - x1) / vp.width) * 100}%;height:${((y2 - y1) / vp.height) * 100}%`;
+    a.href = l.url || '#';
+    a.title = l.url ? l.url : 'Ir para o destino no documento';
+    a.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); followLink(l); });
+    a.addEventListener('dblclick', (e) => e.stopPropagation());
+    a.addEventListener('pointerdown', (e) => e.stopPropagation());
+    layer.append(a);
+  }
+  return layer;
+}
+
+async function followLink(l) {
+  if (l.url) {
+    if (!/^(https?:|mailto:|ftp:)/i.test(l.url)) { toast('Link não suportado: ' + l.url, true); return; }
+    window.open(l.url, '_blank', 'noopener');
+    return;
+  }
+  if (l.dest != null) {
+    const d = await resolveDest(l.dest);
+    if (d) navigateTo(d.page, d.top);
+    else toast('Destino do link não encontrado no documento.', true);
+    return;
+  }
+  const named = { NextPage: E.i + 1, PrevPage: E.i - 1, FirstPage: 0, LastPage: S.n - 1 };
+  if (l.action in named) navigateTo(Math.max(0, Math.min(S.n - 1, named[l.action])), null);
+}
+
+async function resolveDest(dest) {
+  try {
+    const d = typeof dest === 'string' ? await S.pdf.getDestination(dest) : dest;
+    if (!Array.isArray(d) || !d.length) return null;
+    const ref = d[0];
+    const page = ref && typeof ref === 'object' ? await S.pdf.getPageIndex(ref) : Number.isInteger(ref) ? ref : null;
+    if (page == null || page < 0 || page >= S.n) return null;
+    const kind = d[1]?.name;
+    const top = kind === 'XYZ' ? d[3] : kind === 'FitH' || kind === 'FitBH' ? d[2] : kind === 'FitR' ? d[5] : null;
+    return { page, top: typeof top === 'number' ? top : null };
+  } catch { return null; }
+}
+
+function navigateTo(page, top) {
+  if (E.open) {
+    const y = top != null ? Math.max(0, evp(page).convertToViewportPoint(0, top)[1] - 20) : 0;
+    gotoEditorPage(page, y);
+  } else {
+    scrollToPage(page);
+  }
+}
+
+// ---- Ferramentas ----
 function setTool(t) {
   E.tool = t;
   if (t !== 'select') {
@@ -1060,10 +1302,9 @@ function setTool(t) {
 
 function updateToolUI() {
   for (const b of $$('#editor .tool')) b.classList.toggle('active', b.dataset.tool === E.tool);
-  epage.classList.toggle('tool-select', E.tool === 'select');
-  epage.classList.toggle('markup-mode', MARKUP.includes(E.tool));
-  const draw = $('.draw', epage);
-  if (draw) draw.hidden = !DRAW.includes(E.tool);
+  epages.classList.toggle('tool-select', E.tool === 'select');
+  epages.classList.toggle('markup-mode', MARKUP.includes(E.tool));
+  epages.classList.toggle('draw-mode', DRAW.includes(E.tool));
 }
 
 $$('#editor .tool').forEach((b) => { b.onclick = () => setTool(b.dataset.tool); });
@@ -1073,39 +1314,26 @@ $('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
 $('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
+$('#ed-fit').onclick = () => { E.fit = true; rebuildEditorKeepingPosition(); };
 $('#ed-copy-text').onclick = async () => {
   const txt = await getPageText(E.i);
-  try { await navigator.clipboard.writeText(txt); toast('Texto da página copiado.'); } catch { toast('Não foi possível acessar a área de transferência.', true); }
+  try { await navigator.clipboard.writeText(txt); toast(`Texto da página ${E.i + 1} copiado.`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
 };
 
-function gotoEditorPage(i) {
-  if (i < 0 || i >= S.n) return;
-  E.i = i;
-  E.selId = null;
-  $('#editor .ed-scroll').scrollTop = 0;
-  renderEditor();
-}
-
-function zoomEditor(f) {
-  E.fit = false;
-  E.scale = Math.max(0.25, Math.min(6, E.scale * f));
-  renderEditor();
-}
-
-function evtPoint(e) {
-  const r = epage.getBoundingClientRect();
+function evtPoint(e, el) {
+  const r = el.getBoundingClientRect();
   return [e.clientX - r.left, e.clientY - r.top];
 }
-const toPdf = (pt) => E.vp.convertToPdfPoint(pt[0], pt[1]);
-function dispRectToPdf(x1, y1, x2, y2) {
-  const a = toPdf([x1, y1]), b = toPdf([x2, y2]);
+const toPdf = (i, pt) => E.pages.get(i).vp.convertToPdfPoint(pt[0], pt[1]);
+function dispRectToPdf(i, x1, y1, x2, y2) {
+  const a = toPdf(i, [x1, y1]), b = toPdf(i, [x2, y2]);
   return normRect([a[0], a[1], b[0], b[1]]);
 }
 
 function newAnnot(props) {
   const now = new Date();
   const a = {
-    id: uid(), page: E.i, contents: '', author: author(), subject: '', opacity: 1, created: now, modified: now,
+    id: uid(), contents: '', author: author(), subject: '', opacity: 1, created: now, modified: now,
     color: hexToRgb($('#tool-color').value), ...props,
   };
   a.name = a.name || a.id;
@@ -1113,34 +1341,38 @@ function newAnnot(props) {
   S.annots.push(a);
   setDirty(true);
   E.selId = a.id;
-  refreshPage(E.i);
+  refreshPage(a.page);
   renderEditorOverlay();
   renderSideSoon();
   return a;
 }
 
-// Desenho (nota, texto livre, retângulo, elipse, tinta)
-epage.addEventListener('pointerdown', (e) => {
+// Desenho (nota, texto livre, retângulo, elipse, tinta), seleção e movimentação
+epages.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
+  const pel = e.target.closest('.epage');
+  if (!pel) return;
+  const i = +pel.dataset.i;
+  if (!E.pages.has(i)) return;
   const draw = e.target.closest('.draw');
   const hit = e.target.closest('.hit, .handle');
-  const p0 = evtPoint(e);
+  const p0 = evtPoint(e, pel);
   if (draw) {
     e.preventDefault();
     draw.setPointerCapture(e.pointerId);
     const rubber = document.createElement('div');
     rubber.className = 'rubber';
-    epage.append(rubber);
+    pel.append(rubber);
     let ink = null;
     if (E.tool === 'Ink') {
       ink = svgEl('svg', { style: 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none' });
       const pl = svgEl('polyline', { fill: 'none', stroke: $('#tool-color').value, 'stroke-width': 2 * E.scale, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, ink);
       ink._pl = pl;
       ink._pts = [p0];
-      epage.append(ink);
+      pel.append(ink);
       rubber.hidden = true;
     }
-    E.drag = { kind: 'draw', p0, p1: p0, rubber, ink, pointerId: e.pointerId };
+    E.drag = { kind: 'draw', i, el: pel, p0, p1: p0, rubber, ink };
     return;
   }
   if (hit && E.tool === 'select') {
@@ -1148,27 +1380,28 @@ epage.addEventListener('pointerdown', (e) => {
     const handle = e.target.closest('.handle');
     const id = handle ? handle.dataset.handle : hit.closest('[data-id]')?.dataset.id;
     if (!id) return;
-    selectAnnot(id);
+    if (E.selId !== id) { E.selId = id; renderEditorOverlay(); }
     const a = S.annots.find((x) => x.id === id);
     if (!a || a.frame) return;
-    epage.setPointerCapture(e.pointerId);
-    E.drag = { kind: handle ? 'resize' : 'move', p0, id, orig: structuredClone(a), moved: false };
+    pel.setPointerCapture(e.pointerId);
+    E.drag = { kind: handle ? 'resize' : 'move', i, el: pel, p0, id, orig: structuredClone(a), moved: false };
     return;
   }
   if (MARKUP.includes(E.tool)) {
-    E.drag = { kind: 'markup', p0, p1: p0 };
+    E.drag = { kind: 'markup', i, el: pel, p0, p1: p0 };
     return;
   }
-  if (E.tool === 'select' && !e.target.closest('.textLayer span')) {
+  if (E.tool === 'select' && !e.target.closest('.textLayer span') && E.selId) {
     // clique no vazio: desmarca
-    if (E.selId) { E.selId = null; renderEditorOverlay(); }
+    E.selId = null;
+    renderEditorOverlay();
   }
 });
 
-epage.addEventListener('pointermove', (e) => {
+epages.addEventListener('pointermove', (e) => {
   const d = E.drag;
   if (!d) return;
-  const p = evtPoint(e);
+  const p = evtPoint(e, d.el);
   d.p1 = p;
   if (d.kind === 'draw') {
     if (d.ink) {
@@ -1183,24 +1416,19 @@ epage.addEventListener('pointermove', (e) => {
     if (!a) return;
     if (!d.moved && Math.hypot(p[0] - d.p0[0], p[1] - d.p0[1]) < 3) return;
     if (!d.moved) { snapshot(); d.moved = true; }
-    const A = toPdf(d.p0), B = toPdf(p);
+    const A = toPdf(d.i, d.p0), B = toPdf(d.i, p);
     const dx = B[0] - A[0], dy = B[1] - A[1];
     if (d.kind === 'move') {
       Object.assign(a, translateGeom(d.orig, dx, dy));
     } else {
       // redimensiona pelo canto inferior direito (em coordenadas de tela)
-      const r = dispRect(E.vp, d.orig.rect);
-      a.rect = dispRectToPdf(r[0], r[1], Math.max(r[0] + 8, r[2] + (p[0] - d.p0[0])), Math.max(r[1] + 8, r[3] + (p[1] - d.p0[1])));
+      const r = dispRect(E.pages.get(d.i).vp, d.orig.rect);
+      a.rect = dispRectToPdf(d.i, r[0], r[1], Math.max(r[0] + 8, r[2] + (p[0] - d.p0[0])), Math.max(r[1] + 8, r[3] + (p[1] - d.p0[1])));
     }
     a.modified = new Date();
-    renderEditorOverlaySvgOnly();
+    renderEPageOverlay(d.i);
   }
 });
-
-function renderEditorOverlaySvgOnly() {
-  $('svg.ann', epage)?.remove();
-  epage.insertBefore(buildAnnotSvg(E.i, { interactive: true, selectedId: E.selId, scale: E.scale }), $('.draw', epage));
-}
 
 function translateGeom(o, dx, dy) {
   const mv = (arr) => arr.map((v, k) => v + (k % 2 ? dy : dx));
@@ -1211,7 +1439,7 @@ function translateGeom(o, dx, dy) {
   return out;
 }
 
-epage.addEventListener('pointerup', (e) => {
+epages.addEventListener('pointerup', () => {
   const d = E.drag;
   E.drag = null;
   if (!d) return;
@@ -1220,7 +1448,7 @@ epage.addEventListener('pointerup', (e) => {
     d.ink?.remove();
     finishDraw(d);
   } else if (d.kind === 'move' || d.kind === 'resize') {
-    if (d.moved) { setDirty(true); refreshPage(E.i); renderEditorOverlay(); }
+    if (d.moved) { setDirty(true); refreshPage(d.i); renderEditorOverlay(); }
   } else if (d.kind === 'markup') {
     setTimeout(() => finishMarkup(d), 0);
   }
@@ -1229,36 +1457,36 @@ epage.addEventListener('pointerup', (e) => {
 function finishDraw(d) {
   const [x0, y0] = d.p0, [x1, y1] = d.p1;
   const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
-  const s = E.scale;
+  const s = E.scale, i = d.i;
   const L = Math.min(x0, x1), T = Math.min(y0, y1);
   switch (E.tool) {
     case 'Text': {
       const size = 22 * s;
-      newAnnot({ type: 'Text', rect: dispRectToPdf(x0, y0, x0 + size, y0 + size), icon: 'Comment' });
+      newAnnot({ type: 'Text', page: i, rect: dispRectToPdf(i, x0, y0, x0 + size, y0 + size), icon: 'Comment' });
       setTool('select');
       focusContents();
       break;
     }
     case 'FreeText': {
       const r = w < 10 || h < 10 ? [x0, y0, x0 + 220 * s, y0 + 40 * s] : [L, T, L + w, T + h];
-      newAnnot({ type: 'FreeText', rect: dispRectToPdf(...r), fontSize: 12, borderWidth: 0, interiorColor: null });
+      newAnnot({ type: 'FreeText', page: i, rect: dispRectToPdf(i, ...r), fontSize: 12, borderWidth: 0, interiorColor: null });
       setTool('select');
       focusContents();
       break;
     }
     case 'Square': case 'Circle': {
       if (w < 4 || h < 4) return;
-      newAnnot({ type: E.tool, rect: dispRectToPdf(L, T, L + w, T + h), borderWidth: 2 });
+      newAnnot({ type: E.tool, page: i, rect: dispRectToPdf(i, L, T, L + w, T + h), borderWidth: 2 });
       break;
     }
     case 'Ink': {
       const pts = d.ink?._pts || [];
       if (pts.length < 2) return;
       const path = [];
-      for (const p of pts) path.push(...toPdf(p));
+      for (const p of pts) path.push(...toPdf(i, p));
       const bw = 2;
       const bb = quadsBBox(path);
-      newAnnot({ type: 'Ink', inkList: [path], borderWidth: bw, rect: [bb[0] - bw, bb[1] - bw, bb[2] + bw, bb[3] + bw] });
+      newAnnot({ type: 'Ink', page: i, inkList: [path], borderWidth: bw, rect: [bb[0] - bw, bb[1] - bw, bb[2] + bw, bb[3] + bw] });
       break;
     }
   }
@@ -1266,13 +1494,16 @@ function finishDraw(d) {
 
 function finishMarkup(d) {
   const sel = window.getSelection();
-  const tl = $('.textLayer', epage);
+  const tl = $('.textLayer', d.el);
   let rects = [];
   if (sel && !sel.isCollapsed && sel.rangeCount && tl?.contains(sel.anchorNode)) {
-    const base = epage.getBoundingClientRect();
+    const base = d.el.getBoundingClientRect();
     for (let k = 0; k < sel.rangeCount; k++) {
       for (const r of sel.getRangeAt(k).getClientRects()) {
         if (r.width < 1 || r.height < 1) continue;
+        // apenas o trecho que está nesta página
+        const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+        if (cx < base.left || cx > base.right || cy < base.top || cy > base.bottom) continue;
         rects.push({ l: r.left - base.left, t: r.top - base.top, r: r.right - base.left, b: r.bottom - base.top });
       }
     }
@@ -1283,12 +1514,12 @@ function finishMarkup(d) {
   if (!rects.length) return;
   const quads = [];
   for (const r of rects) {
-    const UL = toPdf([r.l, r.t]), UR = toPdf([r.r, r.t]), LL = toPdf([r.l, r.b]), LR = toPdf([r.r, r.b]);
+    const UL = toPdf(d.i, [r.l, r.t]), UR = toPdf(d.i, [r.r, r.t]), LL = toPdf(d.i, [r.l, r.b]), LR = toPdf(d.i, [r.r, r.b]);
     quads.push(...UL, ...UR, ...LL, ...LR);
   }
   const text = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, ' ').trim() : '';
   sel?.removeAllRanges();
-  newAnnot({ type: E.tool, quadPoints: quads, rect: quadsBBox(quads), contents: '', _text: text });
+  newAnnot({ type: E.tool, page: d.i, quadPoints: quads, rect: quadsBBox(quads), contents: '', _text: text });
 }
 
 function mergeLineRects(rects) {
@@ -1308,11 +1539,6 @@ function mergeLineRects(rects) {
     out.push({ ...r });
   }
   return out;
-}
-
-function selectAnnot(id) {
-  E.selId = id;
-  renderEditorOverlay();
 }
 
 function focusContents() {
@@ -1342,7 +1568,7 @@ function renderProps() {
   props.hidden = !a;
   if (!a) return;
   const g = a.group ? S.groups.find((x) => x.id === a.group) : null;
-  $('#props-title').textContent = TYPE_LABELS[a.type] + (g ? ` — marcação “${g.label}”` : '');
+  $('#props-title').textContent = `${TYPE_LABELS[a.type]} — p. ${a.page + 1}` + (g ? ` — marcação “${g.label}”` : '');
   if (document.activeElement?.form !== props) {
     props.contents.value = a.contents || '';
     props.author.value = a.author || '';
@@ -1356,7 +1582,7 @@ function renderProps() {
   $('#props-meta').textContent = [
     a.created ? `Criado: ${fmtDate(a.created)}` : '', a.modified ? `Modificado: ${fmtDate(a.modified)}` : '',
     a._text ? `Texto marcado: “${truncate(a._text, 120)}”` : '',
-    g ? 'Para alterar todas as páginas da marcação, use ✎ no painel lateral.' : '',
+    g ? 'Para alterar todas as páginas da marcação, use ✎ no painel lateral da tela principal.' : '',
   ].filter(Boolean).join(' · ');
 }
 
@@ -1374,18 +1600,13 @@ props.addEventListener('input', (e) => {
   a.modified = new Date();
   setDirty(true);
   refreshPage(a.page);
-  renderEditorOverlaySvgOnly();
+  renderEPageOverlay(a.page);
   renderSideSoon();
-  // atualiza a lista da página sem perder o foco do formulário
-  clearTimeout(props._t);
-  props._t = setTimeout(() => {
-    const list = $('#ed-list');
-    list.innerHTML = '';
-    for (const x of annotsOfPage(E.i).filter((y) => !y.frame).sort((p, q) => q.rect[3] - p.rect[3])) list.append(annotItem(x, false));
-  }, 250);
+  renderEditorListSoon();
 });
 props.addEventListener('submit', (e) => e.preventDefault());
 $('#props-delete').onclick = () => E.selId && deleteAnnot(E.selId);
+$('#props-close').onclick = () => { E.selId = null; renderEditorOverlay(); };
 
 // ============================================================================
 // Busca no texto
@@ -1532,7 +1753,7 @@ window.addEventListener('beforeunload', (e) => {
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { applyZoomVar(); schedulePump(); if (E.open && E.fit) renderEditor(); }, 150);
+  resizeTimer = setTimeout(() => { applyZoomVar(); schedulePump(); if (E.open && E.fit) rebuildEditorKeepingPosition(); }, 150);
 });
 
 // ============================================================================

@@ -54,7 +54,7 @@
           <li><kbd>&lt;</kbd> <kbd>&gt;</kbd> diminuem/aumentam as páginas na tela</li>
           <li>Passe o cursor sobre uma página para ampliá-la e destacar os comentários</li>
           <li>Clique nas páginas para selecioná-las (<kbd>Shift</kbd>+clique seleciona um intervalo) e marque todas com um comentário único</li>
-          <li>Clique duplo abre a página para ler o texto e comentar</li>
+          <li>Clique duplo abre a leitura contínua, para ler o texto, seguir links e comentar</li>
         </ul>
       </div>
     </div>
@@ -94,26 +94,25 @@
   </div>
   <div class="ed-center">
     <div class="ed-bar">
-      <button class="btn icon" id="ed-prev" title="Página anterior (PageUp)">◀</button>
+      <button class="btn icon" id="ed-prev" title="Página anterior (PageUp)">▲</button>
       <span id="ed-pageno"></span>
-      <button class="btn icon" id="ed-next" title="Próxima página (PageDown)">▶</button>
+      <button class="btn icon" id="ed-next" title="Próxima página (PageDown)">▼</button>
       <span class="sep"></span>
       <button class="btn icon" id="ed-zoom-out" title="Reduzir (&lt;)">−</button>
       <span id="ed-zoom"></span>
       <button class="btn icon" id="ed-zoom-in" title="Ampliar (&gt;)">+</button>
+      <button class="btn" id="ed-fit" title="Ajustar à largura">Largura</button>
       <span class="sep"></span>
-      <button class="btn" id="ed-copy-text" title="Copiar o texto da página">Copiar texto</button>
+      <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
       <span class="grow"></span>
-      <button class="btn" id="ed-close" title="Fechar (Esc)">Fechar ✕</button>
+      <button class="btn" id="ed-close" title="Voltar à grade de páginas (Esc)">Fechar ✕</button>
     </div>
-    <div class="ed-scroll"><div class="epage"></div></div>
+    <div class="ed-scroll" tabindex="-1"><div class="epages tool-select"></div></div>
   </div>
   <div class="ed-side">
-    <h3>Comentários da página</h3>
-    <div id="ed-list" class="list"></div>
     <form id="props" hidden autocomplete="off">
-      <h3 id="props-title">Propriedades</h3>
-      <label>Comentário<textarea name="contents" rows="5"></textarea></label>
+      <h3><span id="props-title">Propriedades</span> <button type="button" class="x" id="props-close" title="Fechar propriedades">✕</button></h3>
+      <label>Comentário<textarea name="contents" rows="4"></textarea></label>
       <label>Autor<input name="author"></label>
       <label>Assunto<input name="subject"></label>
       <div class="row">
@@ -125,6 +124,11 @@
       <p class="meta" id="props-meta"></p>
       <button type="button" class="btn danger" id="props-delete">Excluir comentário (Del)</button>
     </form>
+    <div class="ed-list-head">
+      <h3>Comentários do arquivo <span id="ed-count" class="count"></span></h3>
+      <input type="search" id="ed-filter" placeholder="Filtrar comentários…">
+    </div>
+    <div id="ed-list" class="list"></div>
   </div>
 </div>
 
@@ -169,12 +173,12 @@
       <tr><td><kbd>Shift</kbd>+clique</td><td>Seleciona um intervalo de páginas</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd> / <kbd>Esc</kbd></td><td>Seleciona todas / limpa a seleção</td></tr>
       <tr><td><kbd>M</kbd></td><td>Marcar as páginas selecionadas com comentário único</td></tr>
-      <tr><td>Clique duplo</td><td>Abre a página para leitura e comentários</td></tr>
+      <tr><td>Clique duplo</td><td>Abre a leitura contínua (todas as páginas, com texto, links e comentários)</td></tr>
       <tr><td><kbd>L</kbd></td><td>Liga/desliga a lupa ao passar o cursor</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Buscar no texto</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfazer / refazer</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Salvar PDF com comentários</td></tr>
-      <tr><td colspan="2"><b>Na página aberta</b></td></tr>
+      <tr><td colspan="2"><b>Na leitura contínua</b></td></tr>
       <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
       <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Página anterior / próxima</td></tr>
       <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>

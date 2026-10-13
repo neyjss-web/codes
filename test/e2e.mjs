@@ -48,12 +48,13 @@ await page.waitForTimeout(1200);
 console.log('lupa visível:', await page.isVisible('#preview'));
 await page.screenshot({ path: `${OUT}/3-hover.png` });
 
-// Editor: realce por seleção de texto e nota
+// Leitura contínua: realce por seleção de texto e nota na página 3
 await page.mouse.move(5, 5);
 await page.dblclick('.page[data-i="2"]');
-await page.waitForSelector('.textLayer span', { timeout: 10000 });
+await page.waitForSelector('.epage[data-i="2"] .textLayer span', { timeout: 10000 });
+console.log('página atual ao abrir:', await page.textContent('#ed-pageno'));
 await page.keyboard.press('h');
-const span = page.locator('.textLayer span').nth(3);
+const span = page.locator('.epage[data-i="2"] .textLayer span').nth(3);
 const box = await span.boundingBox();
 await page.mouse.move(box.x + 2, box.y + box.height / 2);
 await page.mouse.down();
@@ -61,17 +62,57 @@ await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 5 
 await page.mouse.up();
 await page.waitForTimeout(300);
 await page.keyboard.press('n');
-const ep = await page.locator('.epage').boundingBox();
+const ep = await page.locator('.epage[data-i="2"]').boundingBox();
 await page.mouse.click(ep.x + ep.width - 80, ep.y + 200);
 await page.keyboard.type('Nota criada no teste — ação');
 await page.waitForTimeout(300);
 await page.screenshot({ path: `${OUT}/4-editor.png` });
 await page.keyboard.press('Escape'); // sai do campo
 await page.keyboard.press('Escape'); // desmarca
+
+// 1) Lista com todos os comentários do arquivo; clique salta para a página
+const listInfo = await page.evaluate(() => ({
+  itens: document.querySelectorAll('#ed-list .item').length,
+  paginas: [...document.querySelectorAll('#ed-list .pg-h[data-p]')].map((h) => h.textContent),
+}));
+console.log('lista do arquivo:', listInfo);
+await page.locator('#ed-list .item', { hasText: 'Verificar valor da causa' }).click();
+await page.waitForTimeout(400);
+console.log('após clicar no comentário da p. 1:', await page.textContent('#ed-pageno'), 'selecionado:', await page.evaluate(() => !!window.__pdfnotas.E.selId));
+
+// 3) Hiperlink interno na página 1 (índice → Contestação, fls. 15)
+await page.keyboard.press('Escape');
+await page.waitForSelector('.epage[data-i="0"] .links .lnk');
+const nLinks = await page.locator('.epage[data-i="0"] .links .lnk').count();
+await page.locator('.epage[data-i="0"] .links .lnk').nth(2).click();
+await page.waitForTimeout(500);
+console.log('links na p. 1:', nLinks, '| após clicar no link da Contestação:', await page.textContent('#ed-pageno'));
+const [popup] = await Promise.all([page.waitForEvent('popup', { timeout: 5000 }).catch(() => null), page.evaluate(() => {}).then(async () => {
+  await page.locator('#ed-prev').click(); // garante que a página 1 esteja montada
+  await page.evaluate(() => document.querySelector('.ed-scroll').scrollTo(0, 0));
+  await page.waitForTimeout(300);
+  await page.locator('.epage[data-i="0"] .links .lnk').last().click();
+})]);
+console.log('link externo abriu:', popup ? popup.url() : 'não');
+if (popup) await popup.close();
+
+// 2) Rolagem sequencial
+await page.evaluate(() => { const s = document.querySelector('.ed-scroll'); s.scrollTop = s.scrollHeight / 2; });
+await page.waitForTimeout(600);
+console.log('rolagem para o meio → página atual:', await page.textContent('#ed-pageno'),
+  '| páginas montadas:', await page.evaluate(() => [...window.__pdfnotas.E.pages.keys()].sort((a, b) => a - b).join(',')));
+await page.screenshot({ path: `${OUT}/6-scroll.png` });
 await page.keyboard.press('Escape'); // fecha
-console.log('editor aberto?', await page.isVisible('#editor'));
 const annots = await page.evaluate(() => window.__pdfnotas.S.annots.map((a) => [a.type, a.page, a.contents]));
 console.log('total anotações:', annots.length, annots.filter((a) => !String(a[2]).startsWith('Contesta')));
+
+// Link na grade (páginas grandes)
+for (let k = 0; k < 5; k++) await page.keyboard.press('>');
+await page.evaluate(() => document.querySelector('#viewer').scrollTo(0, 0));
+await page.waitForTimeout(1200);
+await page.locator('.page[data-i="0"] .links .lnk').nth(1).click();
+await page.waitForTimeout(800);
+console.log('grade: link da p. 1 → seleção intacta?', await page.evaluate(() => window.__pdfnotas.S.sel.size), '| topo da grade na página', await page.evaluate(() => { const v = document.querySelector('#viewer'); return [...document.querySelectorAll('.page')].find((p) => p.offsetTop + p.offsetHeight > v.scrollTop + 10)?.dataset.i; }));
 
 // Exporta FDF
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export-fdf')]);

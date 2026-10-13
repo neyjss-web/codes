@@ -23,7 +23,9 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Lupa | Ao passar o cursor sobre uma página, ela aparece ampliada ao lado, com os comentários destacados e numerados, e a lista de textos. <kbd>L</kbd> liga e desliga |
 | Selecionar dezenas de páginas | Clique em cada página, use <kbd>Shift</kbd>+clique para um intervalo ou digite `1-30, 45, 50-` na barra de seleção. <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona todas |
 | Comentário único em várias páginas | **Marcar seleção com comentário…** (ou <kbd>M</kbd>). Informe um rótulo (Contestação, Documentos…), o texto e a cor. Cada página recebe uma nota e, se quiser, uma moldura colorida. A marcação pode ser editada ou excluída em bloco no painel lateral |
-| Ler o texto e comentar | Clique duplo numa página. Dá para selecionar e copiar o texto e usar as ferramentas Nota, Texto livre, Realçar/Sublinhar/Tachar (sobre o texto selecionado), Retângulo, Elipse e Desenho |
+| Ler o texto e comentar | Clique duplo numa página abre a **leitura contínua**: todas as páginas em sequência, com rolagem. Dá para selecionar e copiar o texto e usar as ferramentas Nota, Texto livre, Realçar/Sublinhar/Tachar (sobre o texto selecionado), Retângulo, Elipse e Desenho |
+| Todos os comentários do arquivo | Na leitura contínua, o painel à direita lista as marcações e todos os comentários do arquivo, agrupados por página e com filtro. Clicar num comentário salta até ele e o seleciona |
+| Hiperlinks | Links do PDF funcionam ao clicar: os internos (índices, sumários) saltam para a página de destino e os externos abrem no navegador. Na grade, ficam ativos quando as páginas estão grandes (≥ 300 px) |
 | Busca | <kbd>Ctrl</kbd>+<kbd>F</kbd> marca as páginas que contêm o termo. **Páginas da busca** seleciona todas elas para marcar |
 | FDF | **Exportar FDF** grava todos os comentários. **Importar FDF** mescla com os comentários atuais ou substitui todos. É compatível com Adobe Acrobat/Reader, Foxit e similares |
 | Salvar PDF | Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |

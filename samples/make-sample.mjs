@@ -1,5 +1,5 @@
 // Gera samples/exemplo.pdf: processo fictício com 40 páginas de texto e alguns comentários.
-import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees, PDFName, PDFString } from 'pdf-lib';
 import { writeFileSync } from 'node:fs';
 import { buildAnnotatedPdf } from '../src/pdfannots.js';
 import { finalizeImported } from '../src/model.js';
@@ -31,6 +31,28 @@ for (let i = 1; i <= 40; i++) {
   page.drawText('Assinado digitalmente', { x: 70, y: 105, size: 10, font, color: rgb(0.4, 0.4, 0.4) });
 }
 doc.getPage(29).setRotation(degrees(90));
+
+// Índice com hiperlinks na página 1: links internos para as seções e um link externo
+const p1 = doc.getPage(0);
+const links = [];
+let ly = 380;
+p1.drawText('ÍNDICE', { x: 60, y: ly + 30, size: 14, font: bold });
+for (const [a, , nome] of secoes) {
+  const txt = `${nome} ........ fls. ${a}`;
+  p1.drawText(txt, { x: 60, y: ly, size: 12, font, color: rgb(0, 0, 0.7) });
+  const w = font.widthOfTextAtSize(txt, 12);
+  links.push(doc.context.register(doc.context.obj({
+    Type: 'Annot', Subtype: 'Link', Rect: [58, ly - 3, 62 + w, ly + 12], Border: [0, 0, 0],
+    Dest: [doc.getPage(a - 1).ref, PDFName.of('XYZ'), null, 842, null],
+  })));
+  ly -= 20;
+}
+p1.drawText('Consulta processual: https://www.cnj.jus.br', { x: 60, y: ly - 10, size: 12, font, color: rgb(0, 0, 0.7) });
+links.push(doc.context.register(doc.context.obj({
+  Type: 'Annot', Subtype: 'Link', Rect: [58, ly - 13, 62 + font.widthOfTextAtSize('Consulta processual: https://www.cnj.jus.br', 12), ly + 2], Border: [0, 0, 0],
+  A: { S: 'URI', URI: PDFString.of('https://www.cnj.jus.br') },
+})));
+p1.node.set(PDFName.of('Annots'), doc.context.obj(links));
 const base = await doc.save();
 const annots = [
   finalizeImported({ type: 'Text', page: 0, rect: [520, 760, 540, 780], contents: 'Verificar valor da causa.', author: 'Revisor', color: [1, 0.83, 0] }),

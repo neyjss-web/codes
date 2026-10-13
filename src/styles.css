@@ -201,16 +201,34 @@ svg.ann .handle { fill: var(--accent); stroke: #fff; stroke-width: 1px; vector-e
 .ed-bar .sep { width: 1px; height: 22px; background: var(--border); }
 .ed-bar .grow { flex: 1; }
 #ed-zoom, #ed-pageno { min-width: 60px; text-align: center; color: var(--muted); font-size: 12px; }
-.ed-scroll { flex: 1; overflow: auto; padding: 16px; }
-.epage { position: relative; margin: 0 auto; background: #fff; box-shadow: var(--shadow); }
+.ed-scroll { flex: 1; overflow: auto; padding: 12px 16px 40px; position: relative; outline: none; }
+.epages { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.epage { position: relative; flex: none; background: #fff; box-shadow: var(--shadow); }
+.epage .epno { position: absolute; right: -1px; bottom: -1px; font-size: 11px; line-height: 1; padding: 3px 6px; background: rgb(20 24 32 / 0.72); color: #fff; border-radius: 4px 0 0 0; z-index: 3; pointer-events: none; }
 .epage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .epage svg.ann { pointer-events: none; }
 .epage svg.ann .hit { pointer-events: all; cursor: move; }
 .epage .draw { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
 .epage .rubber { position: absolute; border: 1.5px dashed var(--accent); background: var(--accent-soft); pointer-events: none; }
-.epage.markup-mode .textLayer ::selection { background: rgb(255 212 0 / 0.5); }
+.epages.markup-mode .textLayer ::selection { background: rgb(255 212 0 / 0.5); }
 .textLayer .hit { background: rgb(245 158 11 / 0.4); border-radius: 2px; }
-.ed-side { background: var(--panel); border-left: 1px solid var(--border); padding: 0 10px 16px; overflow: auto; }
+.ed-side { background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#props { flex: none; max-height: 55%; overflow: auto; padding: 0 10px 10px; border-bottom: 1px solid var(--border); }
+#props h3 { display: flex; align-items: center; gap: 6px; }
+#props h3 .x { margin-left: auto; border: none; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+.ed-list-head { flex: none; padding: 0 10px 6px; }
+.ed-list-head input { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }
+#ed-list { flex: 1; overflow: auto; padding: 0 10px 16px; }
+.pg-h { font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 2px 2px; cursor: pointer; position: sticky; top: 0; background: var(--panel); z-index: 1; }
+.pg-h.cur { color: var(--accent); }
+/* Hiperlinks do PDF */
+.links { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.links .lnk { position: absolute; pointer-events: auto; cursor: pointer; border-radius: 2px; }
+.links .lnk:hover { background: rgb(36 88 214 / 0.15); outline: 1px solid rgb(36 88 214 / 0.5); }
+.page .links { display: none; }
+#grid.links-on .page .links { display: block; }
+.epages:not(.tool-select) .links { display: none; }
+.epages:not(.draw-mode) .draw { display: none; }
 #props label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 #props textarea, #props input:not([type=color]):not([type=range]) {
   padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); color: var(--text); font-size: 14px;
@@ -288,7 +306,11 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 .textLayer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
 .textLayer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
 .textLayer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
-.epage:not(.tool-select) svg.ann .hit, .epage:not(.tool-select) svg.ann .handle { pointer-events: none; }
-.epage.tool-select svg.ann .hit { pointer-events: all; }
-.epage.tool-select .textLayer { z-index: 0; }
+.epages:not(.tool-select) svg.ann .hit, .epages:not(.tool-select) svg.ann .handle { pointer-events: none; }
+.epages.tool-select svg.ann .hit { pointer-events: all; }
+.epages.tool-select .textLayer { z-index: 0; }
 .ed-hint { font-size: 12px; color: var(--muted); margin: 6px 0; }
+.epage .textLayer { z-index: 0; }
+.epage svg.ann { z-index: 2; }
+.epage .draw { z-index: 3; }
+.epage .rubber { z-index: 4; }
