@@ -2081,9 +2081,9 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (E.open) {
-    if (e.key === 'PageDown') { e.preventDefault(); gotoEditorPage(E.i + 1); return; }
+    if (e.key === 'PageDown' || (e.key === 'ArrowRight' && !mod)) { e.preventDefault(); gotoEditorPage(E.i + 1); return; }
     if (e.key === '0' && !mod) { e.preventDefault(); fitWholePage(); return; }
-    if (e.key === 'PageUp') { e.preventDefault(); gotoEditorPage(E.i - 1); return; }
+    if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && !mod)) { e.preventDefault(); gotoEditorPage(E.i - 1); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && E.selId) { e.preventDefault(); deleteAnnot(E.selId); return; }
     if (!mod && TOOL_KEYS[e.key.toLowerCase()]) { setTool(TOOL_KEYS[e.key.toLowerCase()]); return; }
     return;
