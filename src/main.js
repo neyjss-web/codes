@@ -235,7 +235,7 @@ async function openPdf(file) {
     } catch (e) {
       console.warn(e);
       canWrite = false;
-      warn = 'Não foi possível ler a estrutura do PDF para gravar comentários (' + e.message + '). Use Exportar FDF para salvar os comentários.';
+      warn = 'Não foi possível ler a estrutura do PDF para gravar comentários (' + e.message + '). Use Salvar FDF para salvar os comentários.';
     }
     progress(0.35, 'Abrindo documento…');
     await nextPaint();
@@ -271,7 +271,7 @@ async function openPdf(file) {
     buildGrid();
     loadOutline();
     for (const b of ['#save-pdf', '#export-fdf', '#search']) $(b).disabled = false;
-    $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Exportar FDF';
+    $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
     const nA = S.annots.length;
@@ -2030,7 +2030,7 @@ const baseName = () => S.fileName.replace(/\.pdf$/i, '') || 'documento';
 async function savePdf() {
   if (!S.pdf) return;
   if (!S.canWrite) {
-    toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Exportar FDF”.', true);
+    toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Salvar FDF”.', true);
     return;
   }
   const name = `${baseName()}-comentado.pdf`;
