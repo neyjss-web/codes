@@ -112,10 +112,30 @@ function toast(msg, err = false, ms = 4000) {
 function progress(frac, text) {
   const p = $('#progress');
   if (frac == null) { p.hidden = true; return; }
-  p.hidden = false;
+  const box = $('#loading');
+  // Com a caixa de carregamento aberta, o progresso aparece só nela
+  p.hidden = !box.hidden;
   $('.bar', p).style.width = `${Math.round(frac * 100)}%`;
   $('span', p).textContent = text || '';
+  if (!box.hidden) {
+    $('.ld-step', box).textContent = text || '';
+    $('.ld-bar div', box).style.width = `${Math.round(frac * 100)}%`;
+  }
 }
+
+// Caixa central "Carregando arquivo PDF…"
+function loadingBox(file) {
+  const box = $('#loading');
+  if (!file) { box.hidden = true; return; }
+  const mb = file.size / 1048576;
+  $('.ld-name', box).textContent = `${file.name} (${mb >= 1 ? mb.toFixed(1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB'})`;
+  $('.ld-step', box).textContent = '';
+  $('.ld-bar div', box).style.width = '0';
+  box.hidden = false;
+}
+
+// Dá ao navegador a chance de desenhar a tela antes de um trabalho pesado
+const nextPaint = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
 function download(bytes, name, type) {
   const url = URL.createObjectURL(new Blob([bytes], { type }));
@@ -190,11 +210,14 @@ async function openPdf(file) {
     if (r !== 'yes') return;
   }
   const gen = ++S.gen;
+  loadingBox(file);
   progress(0.05, 'Lendo arquivo…');
+  await nextPaint();
   try {
     const buf = new Uint8Array(await file.arrayBuffer());
     let annots = [], displayBytes = buf, canWrite = true, trailerId = null, warn = '';
     progress(0.15, 'Lendo comentários existentes…');
+    await nextPaint();
     try {
       const doc = await loadPdfLib(buf.slice());
       annots = readAnnotations(doc);
@@ -210,6 +233,7 @@ async function openPdf(file) {
       warn = 'Não foi possível ler a estrutura do PDF para gravar comentários (' + e.message + '). Use Exportar FDF para salvar os comentários.';
     }
     progress(0.35, 'Abrindo documento…');
+    await nextPaint();
     const task = pdfjsLib.getDocument({ ...DOC_OPTIONS, data: displayBytes === buf ? buf.slice() : displayBytes });
     task.onPassword = (cb, reason) => {
       const pw = prompt(reason === 2 ? 'Senha incorreta. Digite a senha do PDF:' : 'Este PDF é protegido. Digite a senha:');
@@ -231,7 +255,7 @@ async function openPdf(file) {
       const page = await pdf.getPage(i);
       if (gen !== S.gen) return;
       S.vps.push(page.getViewport({ scale: 1 }));
-      if (i % 25 === 0) progress(0.35 + 0.6 * (i / S.n), `Preparando páginas… ${i}/${S.n}`);
+      if (i % 25 === 0) { progress(0.35 + 0.6 * (i / S.n), `Preparando páginas… ${i}/${S.n}`); await nextPaint(); }
     }
     S.annots = annots.filter((a) => a.page < S.n);
     S.groups = rebuildGroups(S.annots, []);
@@ -244,6 +268,7 @@ async function openPdf(file) {
     for (const b of ['#save-pdf', '#export-fdf', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Exportar FDF';
     progress(null);
+    loadingBox(null);
     const nA = S.annots.length;
     toast(`${S.fileName}: ${S.n} página(s)` + (nA ? `, ${nA} comentário(s) existente(s)` : ''));
     if (warn) toast(warn, true);
@@ -251,6 +276,7 @@ async function openPdf(file) {
   } catch (e) {
     console.error(e);
     progress(null);
+    loadingBox(null);
     toast('Erro ao abrir o PDF: ' + e.message, true);
   }
 }
@@ -1145,6 +1171,7 @@ function setCurrentPage(i, force = false) {
   if (!force && i === E.i) return;
   E.i = i;
   updateOutlineCurrent(i);
+  updateNumButton(i);
   $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
   $('#ed-prev').disabled = i === 0;
   $('#ed-next').disabled = i === S.n - 1;
@@ -1335,6 +1362,31 @@ $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
 $('#ed-fit').onclick = fitWholePage;
 function fitWholePage() { E.fit = true; buildEditorPages(E.i, 0); }
+// Número do documento no rodapé do PJe: "Num. 2177293507 - Pág. 1"
+async function getPageNum(i) {
+  const t = await getPageText(i);
+  let last = null;
+  for (const m of t.matchAll(/\bNum\.?\s*:?\s*(\d[\d.]{5,})/gi)) last = m[1];
+  return last ? last.replace(/\D/g, '') : null;
+}
+
+let numGen = 0;
+async function updateNumButton(i) {
+  const g = ++numGen;
+  const btn = $('#ed-copy-num');
+  const num = await getPageNum(i).catch(() => null);
+  if (g !== numGen) return;
+  btn.innerHTML = num ? `Copiar Num. <span class="num">${num}</span>` : 'Copiar Num.';
+  btn.dataset.num = num || '';
+}
+
+$('#ed-copy-num').onclick = async () => {
+  const i = E.i;
+  const num = await getPageNum(i);
+  if (!num) { toast(`Não encontrei “Num.” no texto da página ${i + 1}.`, true); return; }
+  try { await navigator.clipboard.writeText(num); toast(`Num. ${num} copiado (página ${i + 1}).`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
+};
+
 $('#ed-copy-text').onclick = async () => {
   const txt = await getPageText(E.i);
   try { await navigator.clipboard.writeText(txt); toast(`Texto da página ${E.i + 1} copiado.`); } catch { toast('Não foi possível acessar a área de transferência.', true); }

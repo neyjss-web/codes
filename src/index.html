@@ -115,6 +115,7 @@
       <button class="btn" id="ed-fit" title="Mostrar a página inteira na tela (tecla 0)">Página inteira</button>
       <span class="sep"></span>
       <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
+      <button class="btn" id="ed-copy-num" title="Copiar o número do documento (Num.) impresso no rodapé da página atual">Copiar Num.</button>
       <span class="sep"></span>
       <span class="ed-search">
         <input type="search" id="ed-search" placeholder="Buscar no texto…" title="Enter busca; Enter de novo vai para a próxima ocorrência (Shift+Enter: anterior)">
@@ -221,6 +222,17 @@
 <datalist id="label-presets"></datalist>
 <div id="toasts"></div>
 <div id="progress" hidden><div class="bar"></div><span></span></div>
+<div id="loading" hidden role="status" aria-live="polite">
+  <div class="ld-box">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="ld-info">
+      <b>Carregando arquivo PDF…</b>
+      <div class="ld-name"></div>
+      <div class="ld-step"></div>
+      <div class="ld-bar"><div></div></div>
+    </div>
+  </div>
+</div>
 <script type="module">/*__JS__*/</script>
 </body>
 </html>

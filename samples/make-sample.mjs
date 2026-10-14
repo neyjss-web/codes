@@ -29,6 +29,10 @@ for (let i = 1; i <= 40; i++) {
   }
   page.drawRectangle({ x: 60, y: 80, width: width - 120, height: 60, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 1 });
   page.drawText('Assinado digitalmente', { x: 70, y: 105, size: 10, font, color: rgb(0.4, 0.4, 0.4) });
+  // Rodapé no padrão do PJe: número do documento e página dentro dele
+  const docNum = 2177293500 + secoes.findIndex(([a, b]) => i >= a && i <= b);
+  const ini = secoes.find(([a, b]) => i >= a && i <= b)[0];
+  page.drawText(`Num. ${docNum} - Pág. ${i - ini + 1}`, { x: width - 190, y: 40, size: 9, font });
 }
 doc.getPage(29).setRotation(degrees(90));
 
