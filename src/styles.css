@@ -377,3 +377,8 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 #ann-tip .tip-c { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: hidden; }
 #ann-tip .tip-c.vazio { color: #98a2b3; font-style: italic; }
 #ann-tip .tip-q { margin-top: 6px; padding-left: 8px; border-left: 2px solid #e0c96b; color: #475467; font-style: italic; }
+
+#ed-save { margin-right: 4px; }
+.ed-bar { gap: 4px; }
+.ed-bar .btn { padding: 4px 8px; }
+.ed-bar .btn.icon { padding: 4px 5px; }

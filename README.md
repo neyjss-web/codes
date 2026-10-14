@@ -33,7 +33,7 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Hiperlinks | Links do PDF funcionam ao clicar: os internos (índices, sumários) saltam para a página de destino e os externos abrem no navegador. Na grade, ficam ativos quando as páginas estão grandes (≥ 300 px) |
 | Busca | <kbd>Ctrl</kbd>+<kbd>F</kbd> marca as páginas que contêm o termo e mostra “3 de 12 · p. 875”. Os botões ▲ ▼, <kbd>Enter</kbd>/<kbd>Shift</kbd>+<kbd>Enter</kbd> no campo ou <kbd>F3</kbd>/<kbd>Shift</kbd>+<kbd>F3</kbd> passam para a próxima/anterior ocorrência, na grade e na leitura contínua, onde o trecho fica destacado. **Páginas da busca** seleciona todas elas para marcar |
 | FDF | **Exportar FDF** grava todos os comentários. **Importar FDF** mescla com os comentários atuais ou substitui todos. É compatível com Adobe Acrobat/Reader, Foxit e similares |
-| Salvar PDF | Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |
+| Salvar PDF | Botão **Salvar PDF** na barra superior e também na leitura contínua (fica azul quando há alterações não salvas), ou <kbd>Ctrl</kbd>+<kbd>S</kbd>. Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |
 | Desfazer | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 
 Os comentários que já existem no PDF (notas, realces, formas, desenhos, texto livre) são carregados e ficam editáveis.

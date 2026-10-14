@@ -182,6 +182,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function setDirty(v = true) {
   S.dirty = v;
   document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'PDF Notas';
+  // Destaca o botão de salvar da leitura contínua quando há alterações não salvas
+  $('#ed-save')?.classList.toggle('primary', v);
 }
 
 // ---- Desfazer / refazer ----
@@ -1360,6 +1362,7 @@ function updateToolUI() {
 $$('#editor .tool').forEach((b) => { b.onclick = () => setTool(b.dataset.tool); });
 $('#tool-color').oninput = (e) => { if (E.tool !== 'select') settings.set('color-' + E.tool, e.target.value); };
 $('#ed-close').onclick = closeEditor;
+$('#ed-save').onclick = () => savePdf();
 $('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
 $('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
