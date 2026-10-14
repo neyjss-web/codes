@@ -65,6 +65,9 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 .btn.danger { color: var(--danger); }
 .btn.icon { min-width: 30px; justify-content: center; padding: 4px 6px; font-weight: 600; }
 .zoom #zoom-label { min-width: 70px; text-align: center; color: var(--muted); font-size: 12px; }
+.zoom .zoom-cap { color: var(--muted); font-size: 12px; }
+.zoom #zoom-range { width: 110px; accent-color: var(--accent); cursor: pointer; }
+.btn.on { background: var(--accent-soft); border-color: var(--accent); }
 .search input { width: 180px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); min-height: 30px; }
 #search-info { color: var(--muted); font-size: 12px; }
 .chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }

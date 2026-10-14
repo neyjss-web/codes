@@ -302,6 +302,9 @@ function applyZoomVar() {
   // Links clicáveis na grade apenas quando as páginas estão grandes o bastante para leitura
   grid.classList.toggle('links-on', pw >= 300);
   $('#zoom-label').textContent = S.n ? `${perRow} por linha` : `${pw}px`;
+  $('#zoom-range').value = S.zoomIdx;
+  $('#zoom-in').disabled = S.zoomIdx >= ZOOMS.length - 1;
+  $('#zoom-out').disabled = S.zoomIdx <= 0;
 }
 
 function setZoom(idx) {
@@ -1010,7 +1013,12 @@ function resetEditorPages() {
 // Cria os espaços de todas as páginas; o conteúdo é renderizado sob demanda.
 function buildEditorPages(anchor, ratio = 0) {
   resetEditorPages();
-  if (E.fit) E.scale = Math.max(0.3, Math.min(3, (escroll.clientWidth - 48) / S.vps[anchor].width));
+  if (E.fit) {
+    // Página inteira: a página cabe por completo na área visível (largura e altura)
+    const vp = S.vps[anchor];
+    E.scale = Math.max(0.2, Math.min(4, (escroll.clientWidth - 48) / vp.width, (escroll.clientHeight - 28) / vp.height));
+  }
+  $('#ed-fit').classList.toggle('on', E.fit);
   const frag = document.createDocumentFragment();
   for (let i = 0; i < S.n; i++) {
     const el = document.createElement('div');
@@ -1314,7 +1322,8 @@ $('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
 $('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
-$('#ed-fit').onclick = () => { E.fit = true; rebuildEditorKeepingPosition(); };
+$('#ed-fit').onclick = fitWholePage;
+function fitWholePage() { E.fit = true; buildEditorPages(E.i, 0); }
 $('#ed-copy-text').onclick = async () => {
   const txt = await getPageText(E.i);
   try { await navigator.clipboard.writeText(txt); toast(`Texto da página ${E.i + 1} copiado.`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
@@ -1728,6 +1737,8 @@ $('#save-pdf').onclick = savePdf;
 $('#export-fdf').onclick = exportFdfFile;
 $('#zoom-in').onclick = () => setZoom(S.zoomIdx + 1);
 $('#zoom-out').onclick = () => setZoom(S.zoomIdx - 1);
+$('#zoom-range').max = ZOOMS.length - 1;
+$('#zoom-range').oninput = (e) => setZoom(+e.target.value);
 $('#author').onchange = (e) => settings.set('author', e.target.value.trim());
 $('#help-btn').onclick = () => $('#help-dialog').showModal();
 
@@ -1793,6 +1804,7 @@ document.addEventListener('keydown', (e) => {
   }
   if (E.open) {
     if (e.key === 'PageDown') { e.preventDefault(); gotoEditorPage(E.i + 1); return; }
+    if (e.key === '0' && !mod) { e.preventDefault(); fitWholePage(); return; }
     if (e.key === 'PageUp') { e.preventDefault(); gotoEditorPage(E.i - 1); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && E.selId) { e.preventDefault(); deleteAnnot(E.selId); return; }
     if (!mod && TOOL_KEYS[e.key.toLowerCase()]) { setTool(TOOL_KEYS[e.key.toLowerCase()]); return; }

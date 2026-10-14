@@ -17,10 +17,12 @@
     <label class="btn" id="import-fdf-btn" title="Importar comentários de um arquivo FDF">Importar FDF<input type="file" id="import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
     <button class="btn" id="export-fdf" disabled title="Exportar todos os comentários para FDF">Exportar FDF</button>
   </div>
-  <div class="tb-group zoom" title="Tamanho das páginas: teclas &lt; e &gt;">
-    <button class="btn icon" id="zoom-out" aria-label="Diminuir páginas">&lt;</button>
+  <div class="tb-group zoom" title="Tamanho das miniaturas — também pelas teclas &lt; e &gt;">
+    <span class="zoom-cap">Miniaturas</span>
+    <button class="btn" id="zoom-out" title="Miniaturas menores — cabem mais páginas (&lt;)">− Menores</button>
+    <input type="range" id="zoom-range" min="0" max="17" step="1" aria-label="Tamanho das miniaturas">
+    <button class="btn" id="zoom-in" title="Miniaturas maiores — cabem menos páginas (&gt;)">+ Maiores</button>
     <span id="zoom-label">—</span>
-    <button class="btn icon" id="zoom-in" aria-label="Aumentar páginas">&gt;</button>
   </div>
   <div class="tb-group search">
     <input type="search" id="search" placeholder="Buscar no texto…" disabled>
@@ -101,7 +103,7 @@
       <button class="btn icon" id="ed-zoom-out" title="Reduzir (&lt;)">−</button>
       <span id="ed-zoom"></span>
       <button class="btn icon" id="ed-zoom-in" title="Ampliar (&gt;)">+</button>
-      <button class="btn" id="ed-fit" title="Ajustar à largura">Largura</button>
+      <button class="btn" id="ed-fit" title="Mostrar a página inteira na tela (tecla 0)">Página inteira</button>
       <span class="sep"></span>
       <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
       <span class="grow"></span>
@@ -181,6 +183,7 @@
       <tr><td colspan="2"><b>Na leitura contínua</b></td></tr>
       <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
       <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Página anterior / próxima</td></tr>
+      <tr><td><kbd>0</kbd></td><td>Página inteira na tela</td></tr>
       <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>
     </table>
     <p class="hint">Realçar/Sublinhar/Tachar: selecione o texto com a ferramenta ativa, ou arraste um retângulo em áreas sem texto.
