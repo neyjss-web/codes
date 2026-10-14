@@ -124,8 +124,10 @@
         <span id="ed-search-info"></span>
       </span>
       <span class="grow"></span>
-      <button class="btn" id="ed-save" title="Salvar uma cópia do PDF com os comentários (Ctrl+S)">💾 Salvar PDF</button>
-      <button class="btn" id="ed-close" title="Voltar à grade de páginas (Esc)">Fechar ✕</button>
+      <label class="btn" id="ed-import-fdf-btn" title="Carregar comentários de um arquivo FDF">Carregar FDF<input type="file" id="ed-import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
+      <button class="btn" id="ed-fdf" title="Exportar todos os comentários para um arquivo FDF">Salvar FDF</button>
+      <button class="btn" id="ed-save" title="Salvar uma cópia do PDF com os comentários (Ctrl+S)">Salvar PDF</button>
+      <button class="btn" id="ed-close" title="Fechar e voltar à grade de páginas (Esc)"><span class="lbl">Fechar </span>✕</button>
     </div>
     <div class="ed-scroll" tabindex="-1"><div class="epages tool-select"></div></div>
   </div>

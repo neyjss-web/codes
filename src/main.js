@@ -1381,6 +1381,8 @@ $$('#editor .tool').forEach((b) => { b.onclick = () => setTool(b.dataset.tool); 
 $('#tool-color').oninput = (e) => { if (E.tool !== 'select') settings.set('color-' + E.tool, e.target.value); };
 $('#ed-close').onclick = closeEditor;
 $('#ed-save').onclick = () => savePdf();
+$('#ed-fdf').onclick = () => exportFdfFile();
+$('#ed-import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFdfFile(f); };
 $('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
 $('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
@@ -1404,6 +1406,7 @@ async function updateNumButton(i) {
   const num = await getPageNum(i).catch(() => null);
   if (g !== numGen) return;
   btn.innerHTML = num ? `Copiar Num. <span class="num">${num}</span>` : 'Copiar Num.';
+  btn.title = num ? `Copiar “${num}” (rodapé da página ${i + 1})` : 'Copiar o número do documento (Num.) impresso no rodapé da página atual';
   btn.dataset.num = num || '';
 }
 

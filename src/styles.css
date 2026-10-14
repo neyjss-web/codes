@@ -382,3 +382,20 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 .ed-bar { gap: 4px; }
 .ed-bar .btn { padding: 4px 8px; }
 .ed-bar .btn.icon { padding: 4px 5px; }
+/* Barra da visão de página mais compacta em telas menores */
+@media (max-width: 1700px) {
+  .ed-bar .sep { display: none; }
+  #ed-zoom, #ed-pageno { min-width: 46px; }
+  .ed-search input { width: 110px; }
+  /* o número aparece na dica do botão; o botão continua copiando "Num. - Pág." */
+  #ed-copy-num .num { display: none; }
+  #ed-close .lbl { display: none; }
+  #editor { grid-template-columns: 76px 1fr 270px; }
+  .ed-bar .btn { padding: 4px 6px; }
+  .ed-search input { width: 90px; }
+}
+@media (max-width: 1400px) {
+  #editor { grid-template-columns: 64px 1fr 250px; }
+  .ed-bar { padding: 6px; gap: 3px; }
+  .ed-search input { width: 76px; }
+}
