@@ -21,7 +21,7 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Várias páginas contínuas na tela | As páginas se distribuem em grade, quantas couberem na largura, com rolagem contínua |
 | Ao abrir | A grade começa com 4 páginas por linha |
 | Tamanho das miniaturas | Botões **− Menores** / **+ Maiores** e o controle deslizante na barra superior, ou as teclas <kbd>&lt;</kbd> (cabem mais páginas) e <kbd>&gt;</kbd> (cabem menos) |
-| Página inteira | Na leitura contínua, o botão **Página inteira** (ou a tecla <kbd>0</kbd>) ajusta o zoom para a página caber inteira na tela; é o ajuste usado ao abrir |
+| Página inteira | Na leitura contínua, a navegação entre páginas (setas, PageUp/PageDown, ▲ ▼, comentários, marcadores, links e busca) sempre mostra a página inteira na tela, mesmo depois de usar − / +, e ajusta o zoom a páginas de outro tamanho, como as em paisagem. A rolagem com o mouse continua livre. O botão **Página inteira** (ou a tecla <kbd>0</kbd>) refaz o ajuste a qualquer momento |
 | Lupa | Ao passar o cursor sobre uma página, ela aparece ampliada ao lado, com os comentários destacados e numerados, e a lista de textos. <kbd>L</kbd> liga e desliga |
 | Selecionar dezenas de páginas | Clique em cada página, use <kbd>Shift</kbd>+clique para um intervalo ou digite `1-30, 45, 50-` na barra de seleção. <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona todas |
 | Comentário único em várias páginas | **Marcar seleção com comentário…** (ou <kbd>M</kbd>). Informe um rótulo (Contestação, Documentos…), o texto e a cor. Cada página recebe uma nota e, se quiser, uma moldura colorida. A marcação pode ser editada ou excluída em bloco no painel lateral |

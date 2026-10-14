@@ -1034,6 +1034,7 @@ function openEditor(i, selId = null) {
   E.selId = selId;
   $('#editor').hidden = false;
   setTool(E.tool);
+  E.fit = true;
   buildEditorPages(i, 0);
   if (selId) revealAnnot(selId);
   escroll.focus({ preventScroll: true });
@@ -1062,8 +1063,7 @@ function buildEditorPages(anchor, ratio = 0) {
   resetEditorPages();
   if (E.fit) {
     // Página inteira: a página cabe por completo na área visível (largura e altura)
-    const vp = S.vps[anchor];
-    E.scale = Math.max(0.2, Math.min(4, (escroll.clientWidth - 48) / vp.width, (escroll.clientHeight - 28) / vp.height));
+    E.scale = fitScaleFor(anchor);
   }
   $('#ed-fit').classList.toggle('on', E.fit);
   const frag = document.createDocumentFragment();
@@ -1185,10 +1185,33 @@ function setCurrentPage(i, force = false) {
   $(`#ed-list .pg-h[data-p="${i}"]`)?.classList.add('cur');
 }
 
-function gotoEditorPage(i, yOffset = 0, smooth = false) {
+// Escala em que a página i cabe inteira na área visível
+function fitScaleFor(i) {
+  const vp = S.vps[i];
+  return Math.max(0.2, Math.min(4, (escroll.clientWidth - 48) / vp.width, (escroll.clientHeight - 28) / vp.height));
+}
+
+// Se a área visível mudar de tamanho (janela, barra que quebra linha), refaz o ajuste de página inteira
+let fitRaf = 0;
+new ResizeObserver(() => {
+  if (!E.open || !E.fit || fitRaf) return;
+  fitRaf = requestAnimationFrame(() => {
+    fitRaf = 0;
+    if (E.open && E.fit && Math.abs(fitScaleFor(E.i) - E.scale) > 0.005) buildEditorPages(E.i, 0);
+  });
+}).observe(escroll);
+
+// Navegação entre páginas: sempre mostra a página inteira (volta ao ajuste de página inteira
+// se o zoom tiver sido alterado ou se a página tiver outro tamanho/orientação)
+function gotoEditorPage(i, smooth = false) {
   if (i < 0 || i >= S.n) return;
+  if (!E.fit || Math.abs(fitScaleFor(i) - E.scale) > 0.005) {
+    E.fit = true;
+    buildEditorPages(i, 0);
+    return;
+  }
   const el = epageEl(i);
-  escroll.scrollTo({ top: el.offsetTop - 12 + yOffset, behavior: smooth ? 'smooth' : 'auto' });
+  escroll.scrollTo({ top: el.offsetTop - 12, behavior: smooth ? 'smooth' : 'auto' });
   setCurrentPage(i, true);
 }
 
@@ -1209,11 +1232,7 @@ function revealAnnot(id) {
   const a = S.annots.find((x) => x.id === id);
   if (!a) return;
   E.selId = id;
-  const r = dispRect(evp(a.page), a.rect);
-  const visTop = escroll.scrollTop, visBot = visTop + escroll.clientHeight;
-  const absTop = epageEl(a.page).offsetTop + r[1];
-  if (absTop < visTop + 40 || absTop > visBot - 80) gotoEditorPage(a.page, Math.max(0, r[1] - 120));
-  else setCurrentPage(a.page, true);
+  gotoEditorPage(a.page);
   renderEditorOverlay();
 }
 
@@ -1240,7 +1259,7 @@ function renderEditorList() {
         <span class="t"><b>${esc(g.label || 'Marcação')}</b> · ${g.pages.length} pág. · ${esc(truncate(formatPageRanges(g.pages), 40))}</span><span></span>
         ${g.text && g.text !== g.label ? `<div class="c">${esc(g.text)}</div>` : ''}`;
       // Clique: salta para a próxima página da marcação a partir da atual
-      it.onclick = () => gotoEditorPage(g.pages.find((p) => p > E.i) ?? g.pages[0], 0, true);
+      it.onclick = () => gotoEditorPage(g.pages.find((p) => p > E.i) ?? g.pages[0], true);
       list.append(it);
     }
   }
@@ -1260,7 +1279,7 @@ function renderEditorList() {
       h.className = 'pg-h' + (a.page === E.i ? ' cur' : '');
       h.dataset.p = a.page;
       h.textContent = `Página ${a.page + 1}`;
-      h.onclick = () => gotoEditorPage(a.page, 0, true);
+      h.onclick = () => gotoEditorPage(a.page, true);
       list.append(h);
     }
     list.append(annotItem(a, false));
@@ -1335,8 +1354,7 @@ async function resolveDest(dest) {
 
 function navigateTo(page, top) {
   if (E.open) {
-    const y = top != null ? Math.max(0, evp(page).convertToViewportPoint(0, top)[1] - 20) : 0;
-    gotoEditorPage(page, y);
+    gotoEditorPage(page);
   } else {
     scrollToPage(page);
   }
@@ -1961,9 +1979,7 @@ function gotoOcc(idx) {
 
 // Na leitura contínua, rola até a ocorrência dentro da página e a destaca
 function focusHitInEditor(o) {
-  const el = epageEl(o.page);
-  const scrollToEl = () => { escroll.scrollTop = el.offsetTop - 12; };
-  if (!E.pages.get(o.page)?.textReady) scrollToEl();
+  gotoEditorPage(o.page);
   const t0 = performance.now();
   const tryFocus = () => {
     if (!E.open || S.occ[S.occIdx] !== o) return;
@@ -1972,15 +1988,15 @@ function focusHitInEditor(o) {
       return;
     }
     for (const sp of $$('.textLayer span.hit-cur', epages)) sp.classList.remove('hit-cur');
+    const el = epageEl(o.page);
     const full = $$('.textLayer span.full', el);
     const hits = full.length ? full : $$('.textLayer span.hit', el);
     const span = hits[Math.min(o.k, hits.length - 1)];
     if (span) {
       span.classList.add('hit-cur');
       const r = span.getBoundingClientRect(), sr = escroll.getBoundingClientRect();
-      if (r.top < sr.top + 40 || r.bottom > sr.bottom - 40) escroll.scrollTop += r.top - sr.top - escroll.clientHeight / 3;
-    } else scrollToEl();
-    setCurrentPage(o.page, true);
+      if (r.top < sr.top || r.bottom > sr.bottom) escroll.scrollTop += r.top - sr.top - escroll.clientHeight / 3;
+    }
   };
   tryFocus();
 }
@@ -2118,7 +2134,7 @@ window.addEventListener('beforeunload', (e) => {
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { applyZoomVar(); schedulePump(); if (E.open && E.fit) rebuildEditorKeepingPosition(); }, 150);
+  resizeTimer = setTimeout(() => { applyZoomVar(); schedulePump(); }, 150);
 });
 
 // ============================================================================
