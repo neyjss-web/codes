@@ -19,6 +19,7 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Recurso | Como |
 |---|---|
 | Várias páginas contínuas na tela | As páginas se distribuem em grade, quantas couberem na largura, com rolagem contínua |
+| Ao abrir | A grade começa com 4 páginas por linha |
 | Tamanho das miniaturas | Botões **− Menores** / **+ Maiores** e o controle deslizante na barra superior, ou as teclas <kbd>&lt;</kbd> (cabem mais páginas) e <kbd>&gt;</kbd> (cabem menos) |
 | Página inteira | Na leitura contínua, o botão **Página inteira** (ou a tecla <kbd>0</kbd>) ajusta o zoom para a página caber inteira na tela; é o ajuste usado ao abrir |
 | Lupa | Ao passar o cursor sobre uma página, ela aparece ampliada ao lado, com os comentários destacados e numerados, e a lista de textos. <kbd>L</kbd> liga e desliga |
@@ -27,7 +28,7 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Ler o texto e comentar | Clique duplo numa página abre a **leitura contínua**: todas as páginas em sequência, com rolagem. Dá para selecionar e copiar o texto e usar as ferramentas Nota, Texto livre, Realçar/Sublinhar/Tachar (sobre o texto selecionado), Retângulo, Elipse e Desenho |
 | Todos os comentários do arquivo | Na leitura contínua, o painel à direita lista as marcações e todos os comentários do arquivo, agrupados por página e com filtro. Clicar num comentário salta até ele e o seleciona |
 | Hiperlinks | Links do PDF funcionam ao clicar: os internos (índices, sumários) saltam para a página de destino e os externos abrem no navegador. Na grade, ficam ativos quando as páginas estão grandes (≥ 300 px) |
-| Busca | <kbd>Ctrl</kbd>+<kbd>F</kbd> marca as páginas que contêm o termo. **Páginas da busca** seleciona todas elas para marcar |
+| Busca | <kbd>Ctrl</kbd>+<kbd>F</kbd> marca as páginas que contêm o termo e mostra “3 de 12 · p. 875”. Os botões ▲ ▼, <kbd>Enter</kbd>/<kbd>Shift</kbd>+<kbd>Enter</kbd> no campo ou <kbd>F3</kbd>/<kbd>Shift</kbd>+<kbd>F3</kbd> passam para a próxima/anterior ocorrência, na grade e na leitura contínua, onde o trecho fica destacado. **Páginas da busca** seleciona todas elas para marcar |
 | FDF | **Exportar FDF** grava todos os comentários. **Importar FDF** mescla com os comentários atuais ou substitui todos. É compatível com Adobe Acrobat/Reader, Foxit e similares |
 | Salvar PDF | Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |
 | Desfazer | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |

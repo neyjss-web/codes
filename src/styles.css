@@ -317,3 +317,12 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 .epage svg.ann { z-index: 2; }
 .epage .draw { z-index: 3; }
 .epage .rubber { z-index: 4; }
+
+/* Busca: ocorrência atual */
+.page.cur-match { box-shadow: 0 0 0 4px #ea580c, 0 0 14px rgb(234 88 12 / 0.6); }
+.page.selected.cur-match { box-shadow: 0 0 0 3px var(--sel), 0 0 0 7px #ea580c; }
+.textLayer .hit-cur { background: rgb(234 88 12 / 0.55); outline: 2px solid #ea580c; }
+.ed-search { display: inline-flex; align-items: center; gap: 4px; }
+.ed-search input { width: 170px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); min-height: 30px; }
+#ed-search-info { color: var(--muted); font-size: 12px; white-space: nowrap; }
+#search-info { white-space: nowrap; }

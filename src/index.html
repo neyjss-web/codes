@@ -25,7 +25,9 @@
     <span id="zoom-label">—</span>
   </div>
   <div class="tb-group search">
-    <input type="search" id="search" placeholder="Buscar no texto…" disabled>
+    <input type="search" id="search" placeholder="Buscar no texto…" disabled title="Enter busca; Enter de novo vai para a próxima ocorrência (Shift+Enter: anterior)">
+    <button class="btn icon" id="search-prev" disabled title="Ocorrência anterior (Shift+F3)">▲</button>
+    <button class="btn icon" id="search-next" disabled title="Próxima ocorrência (F3)">▼</button>
     <span id="search-info"></span>
   </div>
   <div class="tb-group grow"></div>
@@ -106,6 +108,13 @@
       <button class="btn" id="ed-fit" title="Mostrar a página inteira na tela (tecla 0)">Página inteira</button>
       <span class="sep"></span>
       <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
+      <span class="sep"></span>
+      <span class="ed-search">
+        <input type="search" id="ed-search" placeholder="Buscar no texto…" title="Enter busca; Enter de novo vai para a próxima ocorrência (Shift+Enter: anterior)">
+        <button class="btn icon" id="ed-search-prev" disabled title="Ocorrência anterior (Shift+F3)">▲</button>
+        <button class="btn icon" id="ed-search-next" disabled title="Próxima ocorrência (F3)">▼</button>
+        <span id="ed-search-info"></span>
+      </span>
       <span class="grow"></span>
       <button class="btn" id="ed-close" title="Voltar à grade de páginas (Esc)">Fechar ✕</button>
     </div>
@@ -178,6 +187,7 @@
       <tr><td>Clique duplo</td><td>Abre a leitura contínua (todas as páginas, com texto, links e comentários)</td></tr>
       <tr><td><kbd>L</kbd></td><td>Liga/desliga a lupa ao passar o cursor</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Buscar no texto</td></tr>
+      <tr><td><kbd>F3</kbd> / <kbd>Shift</kbd>+<kbd>F3</kbd></td><td>Próxima / anterior ocorrência da busca (ou Enter / Shift+Enter no campo de busca)</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfazer / refazer</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Salvar PDF com comentários</td></tr>
       <tr><td colspan="2"><b>Na leitura contínua</b></td></tr>

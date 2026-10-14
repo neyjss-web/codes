@@ -65,6 +65,8 @@ const S = {
   text: new Map(),
   links: new Map(),
   matches: new Set(),
+  occ: [],
+  occIdx: -1,
   searchTerm: '',
   undo: [],
   redo: [],
@@ -219,7 +221,7 @@ async function openPdf(file) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), searchTerm: '',
+      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), occ: [], occIdx: -1, searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
@@ -234,6 +236,7 @@ async function openPdf(file) {
     $('#search').value = '';
     $('#search-info').textContent = '';
     setDirty(false);
+    S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     for (const b of ['#save-pdf', '#export-fdf', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Exportar FDF';
@@ -292,6 +295,15 @@ function buildGrid() {
   updateSelectionUI();
   renderSide();
   viewer.scrollTop = 0;
+}
+
+// Maior tamanho de miniatura que ainda permite `n` páginas por linha
+function zoomIdxForPerRow(n) {
+  const avail = viewer.clientWidth - 28;
+  const target = (avail + 12) / n - 12;
+  let idx = 0;
+  for (let k = 0; k < ZOOMS.length; k++) if (ZOOMS[k] <= target) idx = k;
+  return idx;
 }
 
 function applyZoomVar() {
@@ -1075,13 +1087,8 @@ async function renderEPage(i) {
     if (links.length) el.insertBefore(buildLinkLayer(i, links), $('svg.ann', el));
     const textLayer = new pdfjsLib.TextLayer({ textContentSource: page.streamTextContent(), container: tl, viewport: st.vp });
     await textLayer.render();
-    if (S.searchTerm) {
-      const t = normNoSpace(S.searchTerm);
-      for (const span of tl.querySelectorAll('span')) {
-        const s = normNoSpace(span.textContent);
-        if (s && (s.includes(t) || (t.includes(s) && s.length > 3))) span.classList.add('hit');
-      }
-    }
+    markHits(tl);
+    st.textReady = true;
   } catch (e) {
     if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao exibir página', i + 1, e);
   }
@@ -1631,35 +1638,121 @@ async function getPageText(i) {
 }
 
 let searchGen = 0;
+
+// Marca as ocorrências do termo buscado na camada de texto de uma página do editor
+function markHits(tl) {
+  for (const sp of tl.querySelectorAll('span.hit')) sp.classList.remove('hit', 'full', 'hit-cur');
+  if (!S.searchTerm) return;
+  const t = normNoSpace(S.searchTerm);
+  for (const span of tl.querySelectorAll('span')) {
+    const s = normNoSpace(span.textContent);
+    if (!s) continue;
+    if (s.includes(t)) span.classList.add('hit', 'full');
+    else if (t.includes(s) && s.length > 3) span.classList.add('hit');
+  }
+}
+
+function countOcc(hay, t) {
+  let n = 0;
+  for (let k = hay.indexOf(t); k >= 0; k = hay.indexOf(t, k + t.length)) n++;
+  return n;
+}
+
 async function runSearch(term) {
   const gen = ++searchGen;
   S.searchTerm = term;
   S.matches.clear();
-  for (let i = 0; i < S.n; i++) pageEl(i).classList.remove('match');
+  S.occ = [];
+  S.occIdx = -1;
+  for (let i = 0; i < S.n; i++) pageEl(i).classList.remove('match', 'cur-match');
+  if (E.open) for (const tl of $$('.epage .textLayer')) markHits(tl);
   const t = normNoSpace(term);
-  if (!t) { $('#search-info').textContent = ''; updateSelectionUI(); return; }
-  let first = null;
+  syncSearchInputs(term);
+  if (!t) { updateSearchUI(''); updateSelectionUI(); return; }
   for (let i = 0; i < S.n; i++) {
     const txt = await getPageText(i);
     if (gen !== searchGen) return;
-    if (normNoSpace(txt).includes(t)) {
+    const c = countOcc(normNoSpace(txt), t);
+    if (c) {
       S.matches.add(i);
       pageEl(i).classList.add('match');
-      if (first == null) { first = i; scrollToPage(i, false); }
+      for (let k = 0; k < c; k++) S.occ.push({ page: i, k });
+      if (S.occIdx < 0) gotoOcc(0);
     }
-    if (i % 20 === 0) $('#search-info').textContent = `buscando… ${i + 1}/${S.n}`;
+    if (i % 20 === 0) updateSearchUI(`buscando… ${i + 1}/${S.n}`);
   }
-  const n = S.matches.size;
-  $('#search-info').textContent = n ? `${n} página(s)` : 'nada encontrado';
-  if (!n) { const withText = [...S.text.values()].some((x) => x.trim()); if (!withText) toast('Este PDF parece não ter texto (digitalizado sem OCR).', true); }
+  updateSearchUI();
+  if (!S.occ.length) { const withText = [...S.text.values()].some((x) => x.trim()); if (!withText) toast('Este PDF parece não ter texto (digitalizado sem OCR).', true); }
   updateSelectionUI();
 }
 
-$('#search').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); runSearch(e.target.value.trim()); }
-  if (e.key === 'Escape') { e.target.value = ''; runSearch(''); viewer.focus(); }
-});
-$('#search').addEventListener('search', (e) => { if (!e.target.value) runSearch(''); });
+function updateSearchUI(msg) {
+  const n = S.occ?.length || 0;
+  const text = msg ?? (!S.searchTerm ? '' : !n ? 'nada encontrado'
+    : `${S.occIdx + 1} de ${n} · p. ${S.occ[S.occIdx].page + 1}` + (S.matches.size > 1 ? ` (${S.matches.size} págs.)` : ''));
+  for (const id of ['#search-info', '#ed-search-info']) $(id).textContent = text;
+  for (const id of ['#search-prev', '#search-next', '#ed-search-prev', '#ed-search-next']) $(id).disabled = n < 1;
+}
+
+function syncSearchInputs(term) {
+  for (const id of ['#search', '#ed-search']) if ($(id).value.trim() !== term) $(id).value = term;
+}
+
+// Vai para a ocorrência idx (com volta ao início/fim)
+function gotoOcc(idx) {
+  const n = S.occ?.length || 0;
+  if (!n) return;
+  S.occIdx = ((idx % n) + n) % n;
+  const o = S.occ[S.occIdx];
+  updateSearchUI();
+  for (const el of $$('#grid .page.cur-match')) el.classList.remove('cur-match');
+  pageEl(o.page).classList.add('cur-match');
+  if (E.open) focusHitInEditor(o);
+  else scrollToPage(o.page);
+}
+
+// Na leitura contínua, rola até a ocorrência dentro da página e a destaca
+function focusHitInEditor(o) {
+  const el = epageEl(o.page);
+  const scrollToEl = () => { escroll.scrollTop = el.offsetTop - 12; };
+  if (!E.pages.get(o.page)?.textReady) scrollToEl();
+  const t0 = performance.now();
+  const tryFocus = () => {
+    if (!E.open || S.occ[S.occIdx] !== o) return;
+    if (!E.pages.get(o.page)?.textReady) {
+      if (performance.now() - t0 < 5000) requestAnimationFrame(tryFocus);
+      return;
+    }
+    for (const sp of $$('.textLayer span.hit-cur', epages)) sp.classList.remove('hit-cur');
+    const full = $$('.textLayer span.full', el);
+    const hits = full.length ? full : $$('.textLayer span.hit', el);
+    const span = hits[Math.min(o.k, hits.length - 1)];
+    if (span) {
+      span.classList.add('hit-cur');
+      const r = span.getBoundingClientRect(), sr = escroll.getBoundingClientRect();
+      if (r.top < sr.top + 40 || r.bottom > sr.bottom - 40) escroll.scrollTop += r.top - sr.top - escroll.clientHeight / 3;
+    } else scrollToEl();
+    setCurrentPage(o.page, true);
+  };
+  tryFocus();
+}
+
+function searchKey(e) {
+  const term = e.target.value.trim();
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    if (term && term === S.searchTerm && S.occ?.length) gotoOcc(S.occIdx + (e.shiftKey ? -1 : 1));
+    else runSearch(term);
+  }
+  if (e.key === 'Escape') { e.target.value = ''; runSearch(''); (E.open ? escroll : viewer).focus(); }
+}
+for (const id of ['#search', '#ed-search']) {
+  $(id).addEventListener('keydown', searchKey);
+  $(id).addEventListener('search', (e) => { if (!e.target.value) runSearch(''); });
+}
+for (const [id, d] of [['#search-prev', -1], ['#search-next', 1], ['#ed-search-prev', -1], ['#ed-search-next', 1]]) {
+  $(id).onclick = () => gotoOcc(S.occIdx + d);
+}
 
 // ============================================================================
 // Salvar PDF, exportar/importar FDF
@@ -1790,7 +1883,8 @@ document.addEventListener('keydown', (e) => {
   if (typing) return;
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? restore(S.redo, S.undo) : restore(S.undo, S.redo); return; }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); restore(S.redo, S.undo); return; }
-  if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); $('#search').focus(); $('#search').select(); return; }
+  if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); const f = $(E.open ? '#ed-search' : '#search'); f.focus(); f.select(); return; }
+  if (e.key === 'F3') { e.preventDefault(); gotoOcc(S.occIdx + (e.shiftKey ? -1 : 1)); return; }
   if (e.key === 'F1' || e.key === '?') { e.preventDefault(); $('#help-dialog').showModal(); return; }
   if (!S.pdf) return;
   // Tamanho das páginas: < menor (cabem mais), > maior (cabem menos)
