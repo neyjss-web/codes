@@ -1039,6 +1039,7 @@ function openEditor(i, selId = null) {
 
 function closeEditor() {
   E.open = false;
+  hideAnnTip();
   resetEditorPages();
   $('#editor').hidden = true;
   renderSideSoon();
@@ -1474,6 +1475,63 @@ epages.addEventListener('pointerdown', (e) => {
     renderEditorOverlay();
   }
 });
+
+// ---- Pop-up com o conteúdo do comentário ao pairar o cursor ----
+const tip = $('#ann-tip');
+let tipId = null;
+
+function showAnnTip(a, x, y) {
+  const g = a.group ? S.groups.find((k) => k.id === a.group) : null;
+  const head = [
+    `<b>${esc(g ? g.label || 'Marcação' : TYPE_LABELS[a.type])}</b>`,
+    a.subject && !g && a.subject !== TYPE_LABELS[a.type] ? esc(a.subject) : null,
+    a.author ? esc(a.author) : null,
+    fmtDate(a.modified),
+    `p. ${a.page + 1}`,
+  ].filter(Boolean).join(' · ');
+  $('.tip-h', tip).innerHTML = head;
+  const c = $('.tip-c', tip);
+  const text = g && !a.contents ? g.text : a.contents;
+  c.textContent = text || '(comentário sem texto)';
+  c.classList.toggle('vazio', !text);
+  $('.tip-q', tip)?.remove();
+  if (a._text) tip.insertAdjacentHTML('beforeend', `<div class="tip-q">“${esc(truncate(a._text, 200))}”</div>`);
+  tip.style.setProperty('--tip-c', rgbCss(a.color));
+  tip.hidden = false;
+  tipId = a.id;
+  moveAnnTip(x, y);
+}
+
+function moveAnnTip(x, y) {
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let left = x + 16, top = y + 18;
+  if (left + w > window.innerWidth - 8) left = Math.max(8, x - w - 12);
+  if (top + h > window.innerHeight - 8) top = Math.max(8, y - h - 12);
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
+}
+
+function hideAnnTip() {
+  tip.hidden = true;
+  tipId = null;
+}
+
+epages.addEventListener('pointerover', (e) => {
+  if (E.drag) return;
+  const hit = e.target.closest('.hit');
+  if (!hit) return;
+  const id = hit.closest('[data-id]')?.dataset.id;
+  const a = id && S.annots.find((x) => x.id === id);
+  if (a && tipId !== id) showAnnTip(a, e.clientX, e.clientY);
+});
+epages.addEventListener('pointerout', (e) => {
+  if (!tipId) return;
+  const to = e.relatedTarget?.closest?.('.hit')?.closest('[data-id]')?.dataset.id;
+  if (to !== tipId) hideAnnTip();
+});
+epages.addEventListener('pointermove', (e) => { if (tipId && !E.drag) moveAnnTip(e.clientX, e.clientY); });
+epages.addEventListener('pointerdown', hideAnnTip, true);
+escroll.addEventListener('scroll', hideAnnTip, { passive: true });
 
 epages.addEventListener('pointermove', (e) => {
   const d = E.drag;
