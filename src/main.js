@@ -1366,8 +1366,10 @@ function fitWholePage() { E.fit = true; buildEditorPages(E.i, 0); }
 async function getPageNum(i) {
   const t = await getPageText(i);
   let last = null;
-  for (const m of t.matchAll(/\bNum\.?\s*:?\s*(\d[\d.]{5,})/gi)) last = m[1];
-  return last ? last.replace(/\D/g, '') : null;
+  for (const m of t.matchAll(/\bNum\.?\s*:?\s*(\d[\d.]{5,})(?:\s*[-–—]\s*P[áa]g\.?\s*(\d+))?/gi)) last = m;
+  if (!last) return null;
+  // Ex.: "2177293507 - Pág. 1"
+  return last[1].replace(/\D/g, '') + (last[2] ? ` - Pág. ${last[2]}` : '');
 }
 
 let numGen = 0;
@@ -1384,7 +1386,7 @@ $('#ed-copy-num').onclick = async () => {
   const i = E.i;
   const num = await getPageNum(i);
   if (!num) { toast(`Não encontrei “Num.” no texto da página ${i + 1}.`, true); return; }
-  try { await navigator.clipboard.writeText(num); toast(`Num. ${num} copiado (página ${i + 1}).`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
+  try { await navigator.clipboard.writeText(num); toast(`“${num}” copiado (página ${i + 1}).`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
 };
 
 $('#ed-copy-text').onclick = async () => {
