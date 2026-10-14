@@ -15,7 +15,7 @@ page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') 
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 await page.goto(pathToFileURL(resolve('dist/PDFNotas.html')).href);
 await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');
-await page.waitForFunction(() => window.__pdfnotas.S.n === 40, null, { timeout: 30000 });
+await page.waitForFunction(() => window.__pdfnotas.S.n === 40 && document.querySelector('#loading').hidden, null, { timeout: 30000 });
 await page.waitForTimeout(1500);
 const st = await page.evaluate(() => ({ n: window.__pdfnotas.S.annots.length, canWrite: window.__pdfnotas.S.canWrite }));
 console.log('anotações existentes:', st);
@@ -127,7 +127,7 @@ await dl2.saveAs(pdfPath);
 
 // Reabre o PDF salvo e importa o FDF (mescla)
 await page.setInputFiles('#open-pdf', pdfPath);
-await page.waitForFunction(() => window.__pdfnotas.S.fileName === 'salvo.pdf' && document.querySelector('#progress').hidden, null, { timeout: 30000 }).catch(async (e) => { console.log(await page.evaluate(() => [window.__pdfnotas.S.fileName, document.querySelector("#progress").hidden, document.querySelector("#progress span").textContent])); console.log(errors); throw e; });
+await page.waitForFunction(() => window.__pdfnotas.S.fileName === 'salvo.pdf' && document.querySelector('#progress').hidden && document.querySelector('#loading').hidden, null, { timeout: 30000 }).catch(async (e) => { console.log(await page.evaluate(() => [window.__pdfnotas.S.fileName, document.querySelector("#progress").hidden, document.querySelector("#progress span").textContent])); console.log(errors); throw e; });
 console.log('reaberto: anotações lidas do PDF salvo =', await page.evaluate(() => window.__pdfnotas.S.annots.length), 'grupos =', await page.evaluate(() => window.__pdfnotas.S.groups.map((g) => [g.label, g.pages.length])));
 page.once('dialog', (d) => d.accept());
 await page.setInputFiles('#import-fdf', fdfPath);
