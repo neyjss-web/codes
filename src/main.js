@@ -4,7 +4,7 @@ import {
   TYPE_LABELS, defaultColor,
 } from './model.js';
 import { exportFDF, importFDF } from './fdf.js';
-import { loadPdfLib, readAnnotations, stripAnnotations, buildAnnotatedPdf, getTrailerId } from './pdfannots.js';
+import { loadPdfLib, readAnnotations, stripAnnotations, writeAnnotations, getTrailerId } from './pdfannots.js';
 import { quadsBBox } from './annotdict.js';
 
 // ============================================================================
@@ -124,11 +124,14 @@ function progress(frac, text) {
 }
 
 // Caixa central "Carregando arquivo PDF…"
-function loadingBox(file) {
+const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+
+// Caixa central "Carregando arquivo PDF…" / "Salvando arquivo PDF…"
+function loadingBox(file, title = 'Carregando arquivo PDF…') {
   const box = $('#loading');
   if (!file) { box.hidden = true; return; }
-  const mb = file.size / 1048576;
-  $('.ld-name', box).textContent = `${file.name} (${mb >= 1 ? mb.toFixed(1) + ' MB' : Math.max(1, Math.round(file.size / 1024)) + ' KB'})`;
+  $('.ld-title', box).textContent = title;
+  $('.ld-name', box).textContent = file.size != null ? `${file.name} (${fmtSize(file.size)})` : file.name;
   $('.ld-step', box).textContent = '';
   $('.ld-bar div', box).style.width = '0';
   box.hidden = false;
@@ -1950,17 +1953,30 @@ async function savePdf() {
     toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Exportar FDF”.', true);
     return;
   }
+  const name = `${baseName()}-comentado.pdf`;
+  loadingBox({ name }, 'Salvando arquivo PDF…');
   try {
-    progress(0.3, 'Gravando comentários no PDF…');
-    const out = await buildAnnotatedPdf(S.bytes.slice(), S.annots);
-    download(out, `${baseName()}-comentado.pdf`, 'application/pdf');
+    progress(0.1, 'Lendo o documento original…');
+    await nextPaint();
+    const doc = await loadPdfLib(S.bytes.slice());
+    progress(0.4, `Gravando ${S.annots.length} comentário(s)…`);
+    await nextPaint();
+    stripAnnotations(doc);
+    await writeAnnotations(doc, S.annots);
+    progress(0.65, 'Gerando o arquivo PDF…');
+    await nextPaint();
+    const out = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
+    progress(1, `Concluído (${fmtSize(out.length)})`);
+    await nextPaint();
+    download(out, name, 'application/pdf');
     setDirty(false);
-    toast(`PDF salvo com ${S.annots.length} comentário(s).`);
+    toast(`PDF salvo com ${S.annots.length} comentário(s): ${name}`);
   } catch (e) {
     console.error(e);
     toast('Erro ao salvar o PDF: ' + e.message, true);
   } finally {
     progress(null);
+    loadingBox(null);
   }
 }
 
