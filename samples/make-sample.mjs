@@ -1,5 +1,5 @@
 // Gera samples/exemplo.pdf: processo fictício com 40 páginas de texto e alguns comentários.
-import { PDFDocument, StandardFonts, rgb, degrees, PDFName, PDFString } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, degrees, PDFName, PDFString, PDFHexString } from 'pdf-lib';
 import { writeFileSync } from 'node:fs';
 import { buildAnnotatedPdf } from '../src/pdfannots.js';
 import { finalizeImported } from '../src/model.js';
@@ -53,6 +53,32 @@ links.push(doc.context.register(doc.context.obj({
   A: { S: 'URI', URI: PDFString.of('https://www.cnj.jus.br') },
 })));
 p1.node.set(PDFName.of('Annots'), doc.context.obj(links));
+
+// Marcadores (outline): uma entrada por seção; a Contestação tem subitens
+const ctx = doc.context;
+const outlinesRef = ctx.nextRef();
+const dest = (pg) => [doc.getPage(pg - 1).ref, PDFName.of('XYZ'), null, null, null];
+function addItems(parentRef, specs) {
+  const refs = specs.map(() => ctx.nextRef());
+  specs.forEach(([title, pg, kids], k) => {
+    const d = { Title: PDFHexString.fromText(title), Parent: parentRef, Dest: dest(pg) };
+    if (k > 0) d.Prev = refs[k - 1];
+    if (k < specs.length - 1) d.Next = refs[k + 1];
+    if (kids?.length) {
+      const kr = addItems(refs[k], kids);
+      d.First = kr[0]; d.Last = kr[kr.length - 1]; d.Count = -kids.length;
+    }
+    ctx.assign(refs[k], ctx.obj(d));
+  });
+  return refs;
+}
+const top = addItems(outlinesRef, [
+  ['Petição inicial', 1], ['Documentos do autor', 7],
+  ['Contestação', 15, [['Preliminares', 16], ['Mérito', 18], ['Pedidos', 23]]],
+  ['Documentos do réu', 25], ['Réplica', 33],
+]);
+ctx.assign(outlinesRef, ctx.obj({ Type: 'Outlines', First: top[0], Last: top[top.length - 1], Count: top.length }));
+doc.catalog.set(PDFName.of('Outlines'), outlinesRef);
 const base = await doc.save();
 const annots = [
   finalizeImported({ type: 'Text', page: 0, rect: [520, 760, 540, 780], contents: 'Verificar valor da causa.', author: 'Revisor', color: [1, 0.83, 0] }),

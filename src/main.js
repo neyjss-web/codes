@@ -65,6 +65,8 @@ const S = {
   text: new Map(),
   links: new Map(),
   matches: new Set(),
+  outline: [],
+  olFlat: [],
   occ: [],
   occIdx: -1,
   searchTerm: '',
@@ -221,7 +223,7 @@ async function openPdf(file) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), occ: [], occIdx: -1, searchTerm: '',
+      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
@@ -238,6 +240,7 @@ async function openPdf(file) {
     setDirty(false);
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
+    loadOutline();
     for (const b of ['#save-pdf', '#export-fdf', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Exportar FDF';
     progress(null);
@@ -1141,6 +1144,7 @@ escroll.addEventListener('scroll', () => {
 function setCurrentPage(i, force = false) {
   if (!force && i === E.i) return;
   E.i = i;
+  updateOutlineCurrent(i);
   $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
   $('#ed-prev').disabled = i === 0;
   $('#ed-next').disabled = i === S.n - 1;
@@ -1623,6 +1627,132 @@ props.addEventListener('input', (e) => {
 props.addEventListener('submit', (e) => e.preventDefault());
 $('#props-delete').onclick = () => E.selId && deleteAnnot(E.selId);
 $('#props-close').onclick = () => { E.selId = null; renderEditorOverlay(); };
+
+// ============================================================================
+// Marcadores (sumário/outline do PDF) e abas do painel lateral
+// ============================================================================
+
+function setSideTab(tab) {
+  settings.set('sideTab', tab);
+  for (const b of $$('.side-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
+  for (const el of $$('.pane[data-pane]')) el.hidden = el.dataset.pane !== tab;
+  if (tab === 'outline') updateOutlineCurrent(E.open ? E.i : null, true);
+}
+for (const b of $$('.side-tabs button')) b.onclick = () => setSideTab(b.dataset.tab);
+setSideTab(settings.get('sideTab', 'comments'));
+
+async function loadOutline() {
+  const pdf = S.pdf;
+  let outline = [];
+  try { outline = (await pdf.getOutline()) || []; } catch (e) { console.warn('Marcadores indisponíveis', e); }
+  if (pdf !== S.pdf) return;
+  // Numera os itens em ordem do documento
+  const flat = [];
+  const walk = (items, depth) => {
+    for (const it of items) {
+      it._k = flat.length;
+      it._depth = depth;
+      it._open = depth === 0 || false;
+      flat.push(it);
+      if (it.items?.length) walk(it.items, depth + 1);
+    }
+  };
+  walk(outline, 0);
+  // Documentos grandes: mostra só o 1º nível aberto; pequenos: tudo aberto
+  if (flat.length <= 120) for (const it of flat) it._open = true;
+  S.outline = outline;
+  S.olFlat = flat;
+  renderOutlines();
+  // Descobre a página de cada marcador (em segundo plano)
+  for (let k = 0; k < flat.length; k++) {
+    const it = flat[k];
+    if (it.dest != null) {
+      const d = await resolveDest(it.dest);
+      if (pdf !== S.pdf) return;
+      if (d) {
+        it._page = d.page;
+        for (const pg of $$(`.outline .ol[data-k="${k}"] .pg`)) pg.textContent = `p. ${d.page + 1}`;
+      }
+    }
+  }
+  if (E.open) updateOutlineCurrent(E.i, true);
+}
+
+function renderOutlines() {
+  for (const c of [$('#outline-list'), $('#ed-outline-list')]) {
+    const q = norm(c.closest('.pane').querySelector('.ol-filter').value.trim());
+    renderOutline(c, q);
+  }
+  $('#ed-ol-count').textContent = S.olFlat.length ? `(${S.olFlat.length})` : '';
+}
+
+function renderOutline(container, q = '') {
+  container.innerHTML = '';
+  if (!S.pdf) return;
+  if (!S.olFlat.length) {
+    container.innerHTML = '<div class="empty-note">Este PDF não tem marcadores.</div>';
+    return;
+  }
+  const row = (it, depth) => {
+    const kids = !q && it.items?.length;
+    const r = document.createElement('div');
+    r.className = 'ol' + (it.bold ? ' b' : '') + (it.italic ? ' i' : '') + (kids && !it._open ? ' collapsed' : '');
+    r.dataset.k = it._k;
+    r.style.setProperty('--d', depth);
+    r.title = it.title;
+    r.innerHTML = `<span class="tw">${kids ? (it._open ? '▾' : '▸') : ''}</span><span class="tl"></span><span class="pg">${it._page != null ? `p. ${it._page + 1}` : ''}</span>`;
+    $('.tl', r).textContent = it.title || '(sem título)';
+    r.onclick = (e) => {
+      if (kids && e.target.classList.contains('tw')) {
+        it._open = !it._open;
+        r.classList.toggle('collapsed', !it._open);
+        $('.tw', r).textContent = it._open ? '▾' : '▸';
+        return;
+      }
+      for (const x of $$('.outline .ol.cur')) x.classList.remove('cur');
+      for (const x of $$(`.outline .ol[data-k="${it._k}"]`)) x.classList.add('cur');
+      followLink({ url: it.url || null, dest: it.dest ?? null, action: it.action || null });
+    };
+    return r;
+  };
+  if (q) {
+    // Com filtro: lista plana dos marcadores que contêm o termo
+    const hits = S.olFlat.filter((it) => norm(it.title).includes(q));
+    if (!hits.length) container.innerHTML = '<div class="empty-note">Nenhum marcador corresponde ao filtro.</div>';
+    for (const it of hits) container.append(row(it, 0));
+    return;
+  }
+  const build = (items, depth, parent) => {
+    for (const it of items) {
+      parent.append(row(it, depth));
+      if (it.items?.length) {
+        const kids = document.createElement('div');
+        kids.className = 'kids';
+        build(it.items, depth + 1, kids);
+        parent.append(kids);
+      }
+    }
+  };
+  build(S.outline, 0, container);
+}
+
+for (const f of $$('.ol-filter')) {
+  f.addEventListener('input', () => renderOutline(f.closest('.pane').querySelector('.outline'), norm(f.value.trim())));
+}
+
+// Destaca o marcador correspondente à página atual da leitura contínua
+function updateOutlineCurrent(i, reveal = false) {
+  if (i == null || !S.olFlat.length) return;
+  let best = null;
+  for (const it of S.olFlat) if (it._page != null && it._page <= i && (!best || it._page >= best._page)) best = it;
+  const list = $('#ed-outline-list');
+  for (const x of $$('.ol.cur', list)) x.classList.remove('cur');
+  if (!best) return;
+  const el = $(`.ol[data-k="${best._k}"]`, list);
+  if (!el) return;
+  el.classList.add('cur');
+  if (!list.closest('.pane').hidden && (reveal || E.open)) el.scrollIntoView({ block: 'nearest' });
+}
 
 // ============================================================================
 // Busca no texto
