@@ -2,7 +2,7 @@
 // quanto para objetos pdf-lib. Valores: número, boolean, {name}, {text}, {date}, array.
 
 import { toPdfDate, fromPdfDate, pdfColorToRgb, finalizeImported, MANAGED_TYPES, nmWithAnchor } from './model.js';
-import { hasFormatting, runsToPlain, runsToRC, rcToRuns } from './richtext.js';
+import { hasFormatting, runsToPlain, runsToRC, rcToRuns, rcHasOtherFormatting } from './richtext.js';
 
 export const N = (name) => ({ name });
 export const T = (text) => ({ text });
@@ -98,6 +98,8 @@ export function annotFromAccessor(get, page) {
   };
   // /RC: mantém só negrito e vermelho, e só se o texto bater com /Contents
   const rc = str(get('RC'));
+  // marca para revisão: formatação além de negrito/vermelho será descartada
+  if (rc && rcHasOtherFormatting(rc)) a._fmtCleaned = true;
   if (rc) {
     const runs = rcToRuns(rc);
     const norm = (x) => x.replace(/\s+/g, ' ').trim();

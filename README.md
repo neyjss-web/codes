@@ -46,6 +46,11 @@ mesmo Num./Pág. e move o comentário para ela, inclusive as marcações de grup
 PDF atual ficam no número de página original, e o app avisa quantos foram reposicionados e quantos não foram
 encontrados. Páginas sem esse rodapé (por exemplo, digitalizadas sem texto) não recebem vínculo.
 
+**Revisão ao abrir:** sempre que comentários são abertos, tanto os que vêm dentro do PDF quanto os de um FDF, o app vincula ao
+Num./Pág. todos os que ainda não têm vínculo e descarta qualquer formatação de texto que não seja negrito ou vermelho
+(itálico, sublinhado, outras fontes, tamanhos ou cores). Um aviso mostra o que foi revisado, e a revisão é gravada no
+próximo **Salvar PDF** ou **Salvar FDF**.
+
 O FDF continua sendo um FDF padrão: o **Adobe Acrobat/Reader** o carrega normalmente (*Comentários → Importar*), mas coloca
 cada comentário no mesmo número de página de antes, porque não faz o reajuste pelo Num.
 

@@ -147,3 +147,28 @@ export function rcToRuns(xhtml) {
   }
   return normalizeRuns(runs);
 }
+
+// O /RC tem formatação além de negrito/vermelho (itálico, sublinhado, outra fonte/tamanho/cor…)?
+// Estilos padrão do <body>/<p> (fonte, tamanho e cor de base que o Acrobat sempre grava) não contam.
+export function rcHasOtherFormatting(xhtml) {
+  if (!xhtml) return false;
+  const re = /<([a-zA-Z][\w:.-]*)([^>]*)>/g;
+  let m;
+  while ((m = re.exec(String(xhtml)))) {
+    const tag = m[1].toLowerCase().replace(/^.*:/, '');
+    if (['i', 'em', 'u', 's', 'strike', 'del', 'sup', 'sub', 'font', 'a', 'big', 'small'].includes(tag)) return true;
+    if (tag === 'body' || tag === 'p' || tag === 'div') continue;
+    const st = /style\s*=\s*"([^"]*)"|style\s*=\s*'([^']*)'/i.exec(m[2]);
+    if (!st) continue;
+    for (const decl of (st[1] ?? st[2]).split(';')) {
+      const [k, v = ''] = decl.split(':').map((x) => x.trim().toLowerCase());
+      if (!k) continue;
+      if (k === 'font-weight') continue;
+      if (k === 'color') { if (isRed(v) || /^(#000(000)?|black|rgb\(0,\s*0,\s*0\))$/.test(v)) continue; return true; }
+      if (k === 'font-style' && v === 'normal') continue;
+      if (k === 'text-decoration' && v === 'none') continue;
+      return true;
+    }
+  }
+  return false;
+}

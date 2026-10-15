@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
 import { exportFDF, importFDF } from '../src/fdf.js';
 import { buildAnnotatedPdf, loadPdfLib, readAnnotations, stripAnnotations } from '../src/pdfannots.js';
-import { runsToPlain, normalizeRuns, rcToRuns } from '../src/richtext.js';
+import { runsToPlain, normalizeRuns, rcToRuns, rcHasOtherFormatting } from '../src/richtext.js';
 import { finalizeImported, groupNM, rebuildGroups, parsePageRanges, formatPageRanges, findNumPag } from '../src/model.js';
 
 function sample() {
@@ -149,4 +149,13 @@ test('texto rico: negrito e vermelho no /RC (FDF e PDF) e leitura do RC do Acrob
   // sem formatação útil: não grava /RC
   const plain = finalizeImported({ type: 'Text', page: 0, rect: [0, 0, 20, 20], contents: 'simples', name: 'p1' });
   assert.doesNotMatch(new TextDecoder('latin1').decode(exportFDF([plain])), /\/RC /);
+});
+
+test('detecta formatação além de negrito/vermelho no /RC', () => {
+  const base = (inner) => `<?xml version="1.0"?><body xmlns="http://www.w3.org/1999/xhtml" style="font-size:10.0pt;font-family:Helvetica;color:#000000"><p dir="ltr">${inner}</p></body>`;
+  assert.equal(rcHasOtherFormatting(base('<span style="font-weight:bold">a</span><span style="color:#FF0000">b</span>')), false);
+  assert.equal(rcHasOtherFormatting(base('<span style="font-style:italic">a</span>')), true);
+  assert.equal(rcHasOtherFormatting(base('<i>a</i>')), true);
+  assert.equal(rcHasOtherFormatting(base('<span style="font-family:Times">a</span>')), true);
+  assert.equal(rcHasOtherFormatting(base('<span style="color:#0000FF">a</span>')), true);
 });

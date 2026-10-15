@@ -280,6 +280,7 @@ async function openPdf(file) {
     toast(`${S.fileName}: ${S.n} página(s)` + (nA ? `, ${nA} comentário(s) existente(s)` : ''));
     if (warn) toast(warn, true);
     viewer.focus();
+    await reviseAnnotations(S.annots, 'do PDF');
   } catch (e) {
     console.error(e);
     progress(null);
@@ -2139,6 +2140,40 @@ async function findAnchorPage(anchor, hint, onScan) {
   return null;
 }
 
+// Revisão ao abrir comentários (do PDF ou de um FDF): vincula ao Num./Pág. e
+// descarta formatações que não sejam negrito/vermelho (já filtradas na leitura).
+async function reviseAnnotations(list, origem) {
+  if (!list.length) return;
+  const key = (a) => (a.anchor ? `${a.anchor.num}|${a.anchor.pag}` : '');
+  const before = new Map(list.map((a) => [a, key(a)]));
+  const toStamp = list.filter((a) => !a._anchorNotFound);
+  const pages = new Set(toStamp.map((a) => a.page)).size;
+  const box = pages > 15;
+  if (box) loadingBox({ name: `${list.length} comentário(s) ${origem}` }, 'Revisando comentários…');
+  try {
+    await stampAnchors(toStamp);
+  } finally {
+    progress(null);
+    if (box) loadingBox(null);
+  }
+  let linked = 0, semNum = 0, fmt = 0;
+  for (const a of list) {
+    if (key(a) !== before.get(a)) linked++;
+    if (!a.anchor) semNum++;
+    if (a._fmtCleaned) fmt++;
+    delete a._fmtCleaned;
+    delete a._anchorNotFound;
+  }
+  if (!linked && !fmt) return;
+  setDirty(true);
+  if (E.open) renderProps();
+  const partes = [];
+  if (linked) partes.push(`${linked} vinculado(s) ao Num. da página`);
+  if (fmt) partes.push(`formatação ajustada em ${fmt} (mantidos só negrito e vermelho)`);
+  toast(`Comentários ${origem} revisados: ${partes.join('; ')}.` + (semNum ? ` ${semNum} em páginas sem “Num.” no rodapé ficaram sem vínculo.` : '') +
+    ' Salve o PDF ou o FDF para gravar a revisão.', false, 9000);
+}
+
 // Reposiciona comentários vindos de um FDF de outra versão do PDF, usando o Num./Pág.
 async function relocateByAnchor(list) {
   const withAnchor = list.filter((a) => a.anchor);
@@ -2151,7 +2186,7 @@ async function relocateByAnchor(list) {
       progress(k / withAnchor.length, `Localizando Num. ${a.anchor.num} - Pág. ${a.anchor.pag}…`);
       if (k % 10 === 0) await nextPaint();
       const target = await findAnchorPage(a.anchor, a.page, () => { if (++scanned % 25 === 0) progress(k / withAnchor.length, `Lendo o texto das páginas… ${S.anchors.size}/${S.n}`); });
-      if (target == null) { notFound++; continue; }
+      if (target == null) { notFound++; a._anchorNotFound = true; continue; }
       if (target !== a.page) {
         a.page = target;
         if (a.group) a.name = groupNM(a.group, target, a.frame);
@@ -2245,6 +2280,7 @@ async function importFdfFile(file) {
     const pdfName = (fileName || '').split(/[\\/]/).pop();
     if (pdfName && pdfName.toLowerCase() !== S.fileName.toLowerCase()) toast(`Atenção: o FDF foi gerado para “${pdfName}”.`);
     for (const w of warnings) toast(w);
+    await reviseAnnotations(ok, 'do FDF');
   } catch (e) {
     console.error(e);
     toast('Erro ao importar FDF: ' + e.message, true);
