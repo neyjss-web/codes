@@ -273,7 +273,7 @@ async function openPdf(file, target = null) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#search']) $(b).disabled = false;
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
@@ -2263,17 +2263,58 @@ async function openPdfDialog() {
   } catch (e) { if (!isAbort(e)) toast('Não foi possível abrir o arquivo: ' + e.message, true); }
 }
 
+// Fecha o PDF e volta à tela inicial, mantendo o YayNotes aberto
+async function closePdf() {
+  if (!S.pdf) return;
+  if (S.dirty) {
+    const r = await choose(`Há comentários não salvos em “${S.fileName}”. O que fazer antes de fechar?`, [
+      { label: 'Cancelar', value: 'cancel' },
+      { label: 'Fechar sem salvar', value: 'discard' },
+      { label: 'Salvar FDF e fechar', value: 'fdf' },
+      { label: 'Salvar PDF e fechar', value: 'pdf', primary: true },
+    ]);
+    if (!r || r === 'cancel') return;
+    if (r === 'pdf' && !(await savePdf(false))) return;
+    if (r === 'fdf' && !(await exportFdfFile())) return;
+  }
+  if (E.open) closeEditor();
+  hidePreview();
+  hideAnnTip();
+  S.gen++;
+  try { S.task?.destroy(); } catch { /* ignora */ }
+  io?.disconnect();
+  renderState.clear();
+  visible.clear();
+  pv.cache.clear();
+  Object.assign(S, {
+    fileName: '', target: null, fdfHandle: null, bytes: null, pdf: null, task: null, n: 0, vps: [], annots: [], groups: [],
+    sel: new Set(), lastClicked: null, canWrite: false, trailerId: null, text: new Map(), links: new Map(), anchors: new Map(),
+    matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '', undo: [], redo: [],
+  });
+  grid.innerHTML = '';
+  $('#empty').hidden = false;
+  $('#selbar').hidden = true;
+  for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf']) $(b).disabled = true;
+  $('#search').value = '';
+  $('#search').disabled = true;
+  updateSearchUI('');
+  renderSide();
+  renderOutlines();
+  setDirty(false);
+  toast('PDF fechado.');
+}
+
 const baseName = () => S.fileName.replace(/\.pdf$/i, '') || 'documento';
 
 async function savePdf(saveAs = false) {
-  if (!S.pdf) return;
+  if (!S.pdf) return false;
   if (!S.canWrite) {
     toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Salvar FDF”.', true);
-    return;
+    return false;
   }
   let target;
-  try { target = await choosePdfTarget(saveAs); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return; }
-  if (!target) return; // cancelado
+  try { target = await choosePdfTarget(saveAs); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return false; }
+  if (!target) return false; // cancelado
   const name = target.kind === 'handle' ? target.handle.name : target.kind === 'launcher' ? S.fileName : target.name;
   loadingBox({ name }, 'Salvando arquivo PDF…');
   try {
@@ -2300,9 +2341,11 @@ async function savePdf(saveAs = false) {
     toast(target.kind === 'download'
       ? `PDF salvo com ${S.annots.length} comentário(s): ${name} (pasta Downloads)`
       : `${S.annots.length} comentário(s) gravado(s) dentro de ${name}.`);
+    return true;
   } catch (e) {
     console.error(e);
     toast('Erro ao salvar o PDF: ' + e.message + '. O arquivo original não foi alterado.', true);
+    return false;
   } finally {
     progress(null);
     loadingBox(null);
@@ -2310,13 +2353,13 @@ async function savePdf(saveAs = false) {
 }
 
 async function exportFdfFile() {
-  if (!S.pdf) return;
+  if (!S.pdf) return false;
   // escolhe o arquivo primeiro (o navegador exige a ação do usuário para abrir a janela)
   let target = { kind: 'download', name: `${baseName()}.fdf` };
   if (FS_API) {
     let h;
-    try { h = await pickSaveHandle(`${baseName()}.fdf`, FDF_TYPES, S.fdfHandle || S.target?.handle); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return; }
-    if (!h) return; // cancelado
+    try { h = await pickSaveHandle(`${baseName()}.fdf`, FDF_TYPES, S.fdfHandle || S.target?.handle); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return false; }
+    if (!h) return false; // cancelado
     target = { kind: 'handle', handle: h };
   }
   try {
@@ -2327,9 +2370,11 @@ async function exportFdfFile() {
     if (target.kind === 'handle') S.fdfHandle = target.handle;
     setDirty(false);
     toast(`${S.annots.length} comentário(s) salvo(s) em ${target.kind === 'handle' ? target.handle.name : target.name}`);
+    return true;
   } catch (e) {
     console.error(e);
     toast('Erro ao salvar o FDF: ' + e.message, true);
+    return false;
   }
 }
 
@@ -2379,6 +2424,7 @@ $('#import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value
 $('#save-pdf').onclick = () => savePdf(false);
 $('#save-pdf-as').onclick = () => savePdf(true);
 $('#open-pdf-btn').onclick = openPdfDialog;
+$('#close-pdf').onclick = closePdf;
 $('#export-fdf').onclick = exportFdfFile;
 $('#zoom-in').onclick = () => setZoom(S.zoomIdx + 1);
 $('#zoom-out').onclick = () => setZoom(S.zoomIdx - 1);

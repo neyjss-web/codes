@@ -23,6 +23,34 @@ centenas de páginas. Para isso, o YayNotes:
 - ao carregar os comentários num **PDF mais novo do mesmo processo**, coloca cada comentário na página certa,
   mesmo que a numeração tenha mudado. Para isso usa o "Num. … - Pág. …" do rodapé do PJe.
 
+## Como o YayNotes trabalha: o FDF é o seu caderno de anotações
+
+O YayNotes trabalha com um **arquivo FDF**, que guarda **só os seus comentários**, separado do PDF do processo.
+É esse arquivo que **mantém os comentários nas páginas certas** quando o processo é baixado de novo.
+
+```
+  PDF do processo (download de hoje)  +  seus comentários (processo.fdf)
+                         │
+          o processo ganha documentos novos e é baixado de novo
+                         ▼
+  PDF novo (páginas renumeradas)  +  o MESMO processo.fdf
+                         │
+          o YayNotes acha cada comentário pelo "Num. … - Pág. …" do PJe
+                         ▼
+        comentários de volta nas páginas certas do PDF novo
+```
+
+O dia a dia fica assim:
+
+1. **Abra o PDF** do processo e faça seus comentários.
+2. **Salve o FDF** (botão **Salvar FDF**). Guarde-o junto com o processo, por exemplo `0011944-78.1998.fdf`.
+3. Quando baixar uma **versão nova do processo** no PJe, abra o PDF novo e use **Carregar FDF** com o mesmo arquivo.
+   O YayNotes coloca cada comentário na página certa, mesmo que a numeração tenha mudado, e avisa quantos reposicionou.
+4. Continue comentando e **salve o FDF de novo**. Ele passa a ter as páginas atualizadas para essa versão do processo.
+
+Você também pode gravar os comentários **dentro do PDF** (**Salvar PDF**), para ler em qualquer leitor de PDF. Mas, para
+acompanhar o processo ao longo do tempo, o FDF é o arquivo que importa: o PDF muda a cada download, o FDF acompanha.
+
 ## Como usar (Windows)
 
 1. Baixe o arquivo **[`YayNotes.exe`](dist/YayNotes.exe)**. É um arquivo único, sem instalação, que roda no Windows 7, 8, 10 e 11.
@@ -35,6 +63,9 @@ centenas de páginas. Para isso, o YayNotes:
 > Basta abri-lo no Edge ou no Chrome. Funciona também fora do Windows.
 
 **Seus arquivos não saem do seu computador.** O app não envia nada para a internet.
+
+Para trocar de processo sem fechar o app, use **Fechar PDF**. Se houver comentários não salvos, o app pergunta se você
+quer salvar o FDF ou o PDF antes de fechar.
 
 ## O que dá para fazer
 

@@ -15,6 +15,18 @@ Premissas definidas desde o início:
 - **Funciona offline**, e os arquivos não saem do computador.
 - **Comentários em FDF**, o formato de comentários do Adobe, para exportar e importar.
 
+### Como o app trabalha: o FDF mantém as páginas atualizadas
+
+O YayNotes trabalha com um **arquivo FDF**, o "caderno de anotações" do processo, que guarda só os comentários,
+separado do PDF. O PDF do processo muda a cada download do PJe; o FDF acompanha. A cada nova versão:
+
+1. abra o **PDF novo**;
+2. **carregue o mesmo FDF**: cada comentário vai para a página certa pelo "Num. … - Pág. …" (seção 4);
+3. **salve o FDF**: ele passa a refletir as páginas atualizadas dessa versão.
+
+Gravar os comentários dentro do PDF (**Salvar PDF**) também é possível, para leitura em qualquer leitor, mas o
+acompanhamento do processo ao longo do tempo é feito pelo FDF.
+
 ## 2. Telas
 
 ### 2.1 Tela inicial: o processo inteiro em miniaturas
@@ -26,6 +38,7 @@ Premissas definidas desde o início:
 | Abrir com 4 páginas por linha | Ao abrir um PDF, a grade escolhe o maior tamanho em que cabem 4 páginas por linha. |
 | Ampliar a página sob o mouse e destacar os comentários | A **lupa** mostra a página grande ao lado, com os comentários numerados e listados. A tecla `L` liga e desliga. |
 | Selecionar dezenas de páginas e marcar todas com um único comentário | Clique (ou `Shift`+clique, ou digite `1-30, 45`) e use **Marcar seleção com comentário…**. Informe o rótulo (ex.: "Contestação"), o texto, a cor e se quer moldura. A marcação pode ser editada ou excluída de uma vez. |
+| Fechar o PDF e manter o app aberto | Botão **Fechar PDF**: volta à tela inicial. Se houver comentários não salvos, pergunta: *Salvar PDF e fechar*, *Salvar FDF e fechar*, *Fechar sem salvar* ou *Cancelar*. |
 | Avisar que o PDF está carregando | Caixa "Carregando arquivo PDF…" com etapas e barra de progresso. |
 
 ### 2.2 Visão de página (clique duplo numa miniatura)
