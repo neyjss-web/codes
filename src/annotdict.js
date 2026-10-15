@@ -1,7 +1,7 @@
 // Descrição neutra do dicionário de uma anotação, serializável tanto para FDF (texto)
 // quanto para objetos pdf-lib. Valores: número, boolean, {name}, {text}, {date}, array.
 
-import { toPdfDate, fromPdfDate, pdfColorToRgb, finalizeImported, MANAGED_TYPES } from './model.js';
+import { toPdfDate, fromPdfDate, pdfColorToRgb, finalizeImported, MANAGED_TYPES, nmWithAnchor } from './model.js';
 
 export const N = (name) => ({ name });
 export const T = (text) => ({ text });
@@ -15,7 +15,7 @@ export function annotEntries(a) {
     ['Subtype', N(a.type)],
     ['Rect', a.rect.slice()],
     ['F', 4], // Print
-    ['NM', T(a.name)],
+    ['NM', T(nmWithAnchor(a))],
     ['M', T(toPdfDate(a.modified))],
     ['CreationDate', T(toPdfDate(a.created))],
     ['C', (a.color || [1, 0.83, 0]).slice()],

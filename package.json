@@ -7,7 +7,7 @@
     "dev": "node build.mjs --serve",
     "test": "node --test test/*.test.mjs",
     "build:win": "node build.mjs --win",
-    "test:e2e": "node test/e2e.mjs",
+    "test:e2e": "node test/e2e.mjs && node test/e2e-num.mjs",
     "sample": "node samples/make-sample.mjs"
   },
   "repository": {

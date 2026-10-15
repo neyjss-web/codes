@@ -36,6 +36,18 @@ Nenhuma das duas formas precisa de internet nem de instalação. O PDF é proces
 | Salvar PDF | Botão **Salvar PDF** na barra superior e também na leitura contínua (fica azul quando há alterações não salvas), ou <kbd>Ctrl</kbd>+<kbd>S</kbd>. Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |
 | Desfazer | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
 
+### Comentários vinculados ao “Num.” do PJe (novos downloads do processo)
+
+Cada comentário guarda o **“Num. … - Pág. …”** impresso no rodapé da página em que foi feito. O vínculo fica gravado
+no identificador do comentário (`/NM`, por exemplo `a1b2c3;num=2177293507;pag=1`), tanto no FDF quanto no PDF salvo.
+Ao **carregar o FDF em um PDF baixado depois**, em que documentos novos deslocaram as páginas, o app procura a página com o
+mesmo Num./Pág. e move o comentário para ela, inclusive as marcações de grupo. Comentários cujo Num. não existe no
+PDF atual ficam no número de página original, e o app avisa quantos foram reposicionados e quantos não foram
+encontrados. Páginas sem esse rodapé (por exemplo, digitalizadas sem texto) não recebem vínculo.
+
+O FDF continua sendo um FDF padrão: o **Adobe Acrobat/Reader** o carrega normalmente (*Comentários → Importar*), mas coloca
+cada comentário no mesmo número de página de antes, porque não faz o reajuste pelo Num.
+
 Os comentários que já existem no PDF (notas, realces, formas, desenhos, texto livre) são carregados e ficam editáveis.
 As marcações de grupo são gravadas com identificador `grp-<id>-p<página>` (campo `/NM`). Por isso, ao reimportar um FDF
 ou reabrir o PDF salvo, elas voltam agrupadas.
@@ -50,7 +62,8 @@ npm test            # testes de FDF, gravação/leitura no PDF e intervalos de p
 npm run build       # gera dist/PDFNotas.html (arquivo único)
 npm run build:win   # gera também dist/PDFNotas.exe (Windows 32 bits, portátil; usa Go 1.20 via GOTOOLCHAIN)
 npm run dev         # build + servidor em http://localhost:8080
-npm run test:e2e    # teste de ponta a ponta no Chromium (CHROME_PATH=/caminho/do/chrome)
+npm run test:e2e    # testes de ponta a ponta no Chromium (CHROME_PATH=/caminho/do/chrome)
+npm run sample      # gera samples/exemplo.pdf e samples/exemplo-v2.pdf (versão com páginas inseridas)
 ```
 
 Estrutura:

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
 import { exportFDF, importFDF } from '../src/fdf.js';
 import { buildAnnotatedPdf, loadPdfLib, readAnnotations, stripAnnotations } from '../src/pdfannots.js';
-import { finalizeImported, groupNM, rebuildGroups, parsePageRanges, formatPageRanges } from '../src/model.js';
+import { finalizeImported, groupNM, rebuildGroups, parsePageRanges, formatPageRanges, findNumPag } from '../src/model.js';
 
 function sample() {
   const g = 'g1abc';
@@ -99,4 +99,33 @@ test('grava e relê comentários no PDF', async () => {
 test('intervalos de páginas', () => {
   assert.deepEqual(parsePageRanges('1-3, 7; 10-', 12), [0, 1, 2, 6, 9, 10, 11]);
   assert.equal(formatPageRanges([0, 1, 2, 6, 9, 10, 11]), '1–3, 7, 10–12');
+});
+
+test('vínculo Num./Pág. viaja no /NM (FDF e PDF) e não quebra grupos', async () => {
+  const src = [
+    finalizeImported({ type: 'Text', page: 16, rect: [10, 10, 30, 30], contents: 'nota', name: 'abc123', anchor: { num: '2177293502', pag: 3 } }),
+    finalizeImported({ type: 'Square', page: 16, rect: [2, 2, 500, 700], contents: 'g', name: groupNM('g1', 16, true), anchor: { num: '2177293502', pag: 3 } }),
+    finalizeImported({ type: 'Text', page: 1, rect: [10, 10, 30, 30], contents: 'sem vínculo', name: 'semvinc' }),
+  ];
+  const fdfText = new TextDecoder('latin1').decode(exportFDF(src));
+  assert.match(fdfText, /\/NM \(abc123;num=2177293502;pag=3\)/);
+  const { annots } = importFDF(exportFDF(src));
+  assert.deepEqual(annots[0].anchor, { num: '2177293502', pag: 3 });
+  assert.equal(annots[0].name, 'abc123');
+  assert.equal(annots[1].group, 'g1');
+  assert.equal(annots[1].frame, true);
+  assert.deepEqual(annots[1].anchor, { num: '2177293502', pag: 3 });
+  assert.equal(annots[2].anchor, undefined);
+  // PDF
+  const doc = await PDFDocument.create();
+  for (let i = 0; i < 20; i++) doc.addPage([612, 792]);
+  const back = readAnnotations(await loadPdfLib(await buildAnnotatedPdf(await doc.save(), src)));
+  const n = back.find((a) => a.name === 'abc123');
+  assert.deepEqual(n.anchor, { num: '2177293502', pag: 3 });
+});
+
+test('findNumPag lê o rodapé do PJe', () => {
+  assert.deepEqual(findNumPag('blá Num. 2177293507 - Pág. 12 fim'), { num: '2177293507', pag: 12 });
+  assert.deepEqual(findNumPag('Num. 834877049 – Pag. 1'), { num: '834877049', pag: 1 });
+  assert.equal(findNumPag('sem rodapé'), null);
 });

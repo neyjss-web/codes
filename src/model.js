@@ -28,6 +28,27 @@ export function normRect(r) {
   return [Math.min(r[0], r[2]), Math.min(r[1], r[3]), Math.max(r[0], r[2]), Math.max(r[1], r[3])];
 }
 
+// Vínculo do comentário ao documento do PJe ("Num. 2177293507 - Pág. 1"), gravado como sufixo
+// do identificador /NM (preservado pelo Adobe Acrobat/Reader): "<nome>;num=2177293507;pag=1".
+const ANCHOR_RE = /;num=(\d+);pag=(\d+)$/;
+
+export function nmWithAnchor(a) {
+  return a.anchor ? `${a.name};num=${a.anchor.num};pag=${a.anchor.pag}` : a.name;
+}
+
+export function splitAnchor(nm) {
+  const m = ANCHOR_RE.exec(nm || '');
+  return m ? { name: nm.slice(0, m.index), anchor: { num: m[1], pag: +m[2] } } : { name: nm || '', anchor: null };
+}
+
+// "Num. 2177293507 - Pág. 1" no texto de uma página → { num, pag } (último encontrado na página)
+export function findNumPag(text) {
+  let last = null;
+  for (const m of String(text).matchAll(/\bNum\.?\s*:?\s*(\d[\d.]{5,})(?:\s*[-–—]\s*P[áa]g\.?\s*(\d+))?/gi)) last = m;
+  if (!last) return null;
+  return { num: last[1].replace(/\D/g, ''), pag: last[2] ? +last[2] : null };
+}
+
 export function groupNM(groupId, page, frame) {
   return `grp-${groupId}-p${page + 1}${frame ? '-f' : ''}`;
 }
@@ -97,6 +118,9 @@ export function finalizeImported(annot) {
   annot.created = annot.created || new Date();
   annot.modified = annot.modified || annot.created;
   if (!annot.name) annot.name = annot.id;
+  const sp = splitAnchor(annot.name);
+  annot.name = sp.name || annot.id;
+  if (sp.anchor) annot.anchor = sp.anchor;
   const g = parseGroupNM(annot.name);
   if (g) { annot.group = g.groupId; annot.frame = g.frame; }
   return annot;

@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {
-  uid, normRect, groupNM, rebuildGroups, parsePageRanges, formatPageRanges, rgbToHex, hexToRgb, rgbCss,
+  uid, normRect, groupNM, rebuildGroups, findNumPag, parsePageRanges, formatPageRanges, rgbToHex, hexToRgb, rgbCss,
   TYPE_LABELS, defaultColor,
 } from './model.js';
 import { exportFDF, importFDF } from './fdf.js';
@@ -64,6 +64,7 @@ const S = {
   gen: 0,
   text: new Map(),
   links: new Map(),
+  anchors: new Map(),
   matches: new Set(),
   outline: [],
   olFlat: [],
@@ -252,7 +253,7 @@ async function openPdf(file) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '',
+      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
@@ -1391,12 +1392,9 @@ $('#ed-fit').onclick = fitWholePage;
 function fitWholePage() { E.fit = true; buildEditorPages(E.i, 0); }
 // Número do documento no rodapé do PJe: "Num. 2177293507 - Pág. 1"
 async function getPageNum(i) {
-  const t = await getPageText(i);
-  let last = null;
-  for (const m of t.matchAll(/\bNum\.?\s*:?\s*(\d[\d.]{5,})(?:\s*[-–—]\s*P[áa]g\.?\s*(\d+))?/gi)) last = m;
-  if (!last) return null;
+  const np = findNumPag(await getPageText(i));
   // Ex.: "2177293507 - Pág. 1"
-  return last[1].replace(/\D/g, '') + (last[2] ? ` - Pág. ${last[2]}` : '');
+  return np ? np.num + (np.pag != null ? ` - Pág. ${np.pag}` : '') : null;
 }
 
 let numGen = 0;
@@ -1446,6 +1444,8 @@ function newAnnot(props) {
   refreshPage(a.page);
   renderEditorOverlay();
   renderSideSoon();
+  // vincula ao Num./Pág. da página (para reposicionar em versões futuras do PDF)
+  getPageAnchor(a.page).then((an) => { if (an) { a.anchor = { num: an.num, pag: an.pag }; if (E.selId === a.id) renderProps(); } });
   return a;
 }
 
@@ -1741,6 +1741,7 @@ function renderProps() {
   $('#props-meta').textContent = [
     a.created ? `Criado: ${fmtDate(a.created)}` : '', a.modified ? `Modificado: ${fmtDate(a.modified)}` : '',
     a._text ? `Texto marcado: “${truncate(a._text, 120)}”` : '',
+    a.anchor ? `Vinculado a Num. ${a.anchor.num} - Pág. ${a.anchor.pag}` : '',
     g ? 'Para alterar todas as páginas da marcação, use ✎ no painel lateral da tela principal.' : '',
   ].filter(Boolean).join(' · ');
 }
@@ -2025,6 +2026,78 @@ for (const [id, d] of [['#search-prev', -1], ['#search-next', 1], ['#ed-search-p
 // Salvar PDF, exportar/importar FDF
 // ============================================================================
 
+// ---- Vínculo dos comentários ao "Num. ... - Pág. ..." do PJe ----
+
+// { num, pag } da página i (ou null se o rodapé não tiver "Num. ... - Pág. ...")
+async function getPageAnchor(i) {
+  if (S.anchors.has(i)) return S.anchors.get(i);
+  let a = null;
+  try {
+    const np = findNumPag(await getPageText(i));
+    if (np && np.pag != null) a = np;
+  } catch { a = null; }
+  S.anchors.set(i, a);
+  return a;
+}
+
+// Grava em cada comentário o Num./Pág. da página em que ele está
+async function stampAnchors(list) {
+  const pages = [...new Set(list.map((a) => a.page))];
+  const big = pages.length > 40;
+  for (let k = 0; k < pages.length; k++) {
+    await getPageAnchor(pages[k]);
+    if (big && k % 20 === 0) { progress(k / pages.length, `Vinculando comentários ao Num. das páginas… ${k}/${pages.length}`); await nextPaint(); }
+  }
+  for (const a of list) {
+    const an = S.anchors.get(a.page);
+    if (an) a.anchor = { num: an.num, pag: an.pag }; else delete a.anchor;
+  }
+}
+
+// Procura a página com o mesmo Num./Pág., começando perto da página original
+async function findAnchorPage(anchor, hint, onScan) {
+  const key = (x) => x && `${x.num}|${x.pag}`;
+  const want = key(anchor);
+  for (const [i, an] of S.anchors) if (key(an) === want) return i;
+  hint = Math.max(0, Math.min(S.n - 1, hint));
+  for (let d = 0; d < S.n; d++) {
+    for (const i of d ? [hint + d, hint - d] : [hint]) {
+      if (i < 0 || i >= S.n || S.anchors.has(i)) continue;
+      const an = await getPageAnchor(i);
+      onScan?.();
+      if (key(an) === want) return i;
+    }
+    if (hint - d < 0 && hint + d >= S.n) break;
+  }
+  return null;
+}
+
+// Reposiciona comentários vindos de um FDF de outra versão do PDF, usando o Num./Pág.
+async function relocateByAnchor(list) {
+  const withAnchor = list.filter((a) => a.anchor);
+  let moved = 0, notFound = 0, scanned = 0;
+  if (!withAnchor.length) return { moved, notFound, total: 0 };
+  loadingBox({ name: `${withAnchor.length} comentário(s) vinculados ao Num.` }, 'Ajustando comentários ao PDF atual…');
+  try {
+    for (let k = 0; k < withAnchor.length; k++) {
+      const a = withAnchor[k];
+      progress(k / withAnchor.length, `Localizando Num. ${a.anchor.num} - Pág. ${a.anchor.pag}…`);
+      if (k % 10 === 0) await nextPaint();
+      const target = await findAnchorPage(a.anchor, a.page, () => { if (++scanned % 25 === 0) progress(k / withAnchor.length, `Lendo o texto das páginas… ${S.anchors.size}/${S.n}`); });
+      if (target == null) { notFound++; continue; }
+      if (target !== a.page) {
+        a.page = target;
+        if (a.group) a.name = groupNM(a.group, target, a.frame);
+        moved++;
+      }
+    }
+  } finally {
+    progress(null);
+    loadingBox(null);
+  }
+  return { moved, notFound, total: withAnchor.length };
+}
+
 const baseName = () => S.fileName.replace(/\.pdf$/i, '') || 'documento';
 
 async function savePdf() {
@@ -2038,6 +2111,7 @@ async function savePdf() {
   try {
     progress(0.1, 'Lendo o documento original…');
     await nextPaint();
+    await stampAnchors(S.annots);
     const doc = await loadPdfLib(S.bytes.slice());
     progress(0.4, `Gravando ${S.annots.length} comentário(s)…`);
     await nextPaint();
@@ -2060,8 +2134,10 @@ async function savePdf() {
   }
 }
 
-function exportFdfFile() {
+async function exportFdfFile() {
   if (!S.pdf) return;
+  await stampAnchors(S.annots);
+  progress(null);
   const bytes = exportFDF(S.annots, { fileName: S.fileName, idHex: S.trailerId });
   download(bytes, `${baseName()}.fdf`, 'application/vnd.fdf');
   setDirty(false);
@@ -2072,6 +2148,8 @@ async function importFdfFile(file) {
   if (!S.pdf) { toast('Abra primeiro o PDF ao qual o FDF se refere.', true); return; }
   try {
     const { annots, fileName, warnings } = importFDF(new Uint8Array(await file.arrayBuffer()));
+    // Comentários vinculados ao Num./Pág. vão para a página correspondente deste PDF
+    const rel = await relocateByAnchor(annots);
     const ok = annots.filter((a) => a.page >= 0 && a.page < S.n);
     const skipped = annots.length - ok.length;
     if (!ok.length) { toast('Nenhum comentário aplicável encontrado no FDF.' + (skipped ? ` (${skipped} fora do intervalo de páginas)` : ''), true); return; }
@@ -2095,6 +2173,8 @@ async function importFdfFile(file) {
     let msg = `${ok.length} comentário(s) importado(s)` + (replaced ? ` (${replaced} atualizados)` : '') + '.';
     if (skipped) msg += ` ${skipped} ignorado(s): página inexistente.`;
     toast(msg);
+    if (rel.moved) toast(`${rel.moved} comentário(s) reposicionado(s) pelo Num./Pág. (a numeração das páginas mudou neste PDF).`, false, 8000);
+    if (rel.notFound) toast(`${rel.notFound} comentário(s) vinculado(s) a um Num. que não existe neste PDF: mantidos no número de página original.`, true);
     const pdfName = (fileName || '').split(/[\\/]/).pop();
     if (pdfName && pdfName.toLowerCase() !== S.fileName.toLowerCase()) toast(`Atenção: o FDF foi gerado para “${pdfName}”.`);
     for (const w of warnings) toast(w);
