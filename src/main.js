@@ -39,6 +39,9 @@ const DOC_OPTIONS = {
   wasmUrl: 'embedded/',
   isEvalSupported: false,
   enableXfa: false,
+  // Desenho pela placa de vídeo: páginas digitalizadas (imagens grandes) ficam prontas bem mais rápido
+  // e não travam a tela enquanto são desenhadas
+  enableHWA: true,
 };
 
 // ============================================================================
@@ -1092,6 +1095,7 @@ function resetEditorPages() {
   E.prio = null;
   E.navTok = (E.navTok || 0) + 1;
   E.pendingNav = null;
+  showPageWait(null);
   epages.innerHTML = '';
 }
 
@@ -1298,7 +1302,9 @@ escroll.addEventListener('scroll', () => {
 
 function setCurrentPage(i, force = false) {
   if (!force && i === E.i) return;
+  const fwd = i >= (E.i ?? 0);
   E.i = i;
+  prefetchAround(i, fwd);
   pumpEPages();
   updateOutlineCurrent(i);
   updateNumButton(i);
@@ -1307,6 +1313,13 @@ function setCurrentPage(i, force = false) {
   $('#ed-next').disabled = i === S.n - 1;
   for (const h of $$('#ed-list .pg-h.cur')) h.classList.remove('cur');
   $(`#ed-list .pg-h[data-p="${i}"]`)?.classList.add('cur');
+}
+
+// Adianta o desenho das vizinhas (no sentido da leitura primeiro): ao avançar, a próxima página
+// normalmente já está pronta, mesmo em páginas digitalizadas pesadas
+function prefetchAround(i, fwd = true) {
+  if (!E.open || !E.pages) return;
+  for (const k of fwd ? [i + 1, i + 2, i - 1] : [i - 1, i - 2, i + 1]) wantEPage(k);
 }
 
 // Centraliza cada página numa posição de pixel inteiro da tela (meio pixel de deslocamento embaça)
@@ -1350,17 +1363,23 @@ async function gotoEditorPage(i, smooth = false) {
     return;
   }
   // Sem "piscar": se a página de destino ainda não estiver desenhada, a página atual continua
-  // na tela até a nova ficar pronta (no máximo 1,5 s) e só então a troca acontece
+  // na tela até a nova ficar pronta (no máximo 6 s, para páginas digitalizadas pesadas) e só então
+  // a troca acontece. Se demorar, um aviso discreto mostra que a página está sendo carregada.
   if (!E.pages.get(i)?.ready) {
     const tok = (E.navTok = (E.navTok || 0) + 1);
     E.pendingNav = i;
     E.prio = i;
     wantEPage(i);
     const t0 = performance.now();
-    while (!E.pages.get(i)?.ready && performance.now() - t0 < 1500) {
+    while (!E.pages.get(i)?.ready && performance.now() - t0 < 6000) {
       await new Promise((r) => setTimeout(r, 20));
-      if (tok !== E.navTok || !E.open) return;
+      if (tok !== E.navTok || !E.open) {
+        if (!E.open || E.pendingNav == null) showPageWait(null); // a navegação mais nova não está esperando
+        return;
+      }
+      if (performance.now() - t0 > 350) showPageWait(i);
     }
+    showPageWait(null);
     E.prio = null;
   }
   E.pendingNav = null;
@@ -1368,6 +1387,13 @@ async function gotoEditorPage(i, smooth = false) {
   if (!el) return;
   escroll.scrollTo({ top: el.offsetTop - 12, behavior: smooth ? 'smooth' : 'auto' });
   setCurrentPage(i, true);
+}
+
+function showPageWait(i) {
+  const w = $('#ed-wait');
+  if (i == null) { w.hidden = true; return; }
+  w.textContent = `Carregando página ${i + 1}…`;
+  w.hidden = false;
 }
 
 function zoomEditor(f) {
@@ -1586,6 +1612,43 @@ function dispRectToPdf(i, x1, y1, x2, y2) {
   return normRect([a[0], a[1], b[0], b[1]]);
 }
 
+// ---- Copiar, recortar e colar comentários (Ctrl+C, Ctrl+X, Ctrl+V com um comentário selecionado) ----
+function copyAnnot(cut) {
+  const a = S.annots.find((x) => x.id === E.selId);
+  if (!a) return false;
+  E.clip = structuredClone(a);
+  // o texto do comentário também vai para a área de transferência (para colar em outro programa)
+  if (a.contents) navigator.clipboard?.writeText(cleanText(a.contents)).catch(() => {});
+  if (cut) {
+    deleteAnnot(a.id);
+    toast(`${TYPE_LABELS[a.type]} recortado(a). Use Ctrl+V para colar.`, false, 2000);
+  } else toast(`${TYPE_LABELS[a.type]} copiado(a). Use Ctrl+V para colar.`, false, 2000);
+  return true;
+}
+
+function pasteAnnot() {
+  const src = E.clip;
+  if (!src || !S.pdf) return false;
+  // destino: a página sob o cursor (na posição do cursor) ou a página atual
+  const k = E.mouse && E.pages.has(E.mouse.i) ? E.mouse.i : E.i;
+  let dx = 0, dy = 0;
+  if (E.mouse && E.mouse.i === k && E.pages.has(k)) {
+    const p = toPdf(k, E.mouse.pt);
+    dx = p[0] - src.rect[0];
+    dy = p[1] - src.rect[3];
+  } else if (k === src.page) {
+    dx = 12; dy = -12; // mesma página: desloca um pouco para não ficar por cima do original
+  }
+  const c = structuredClone(src);
+  for (const f of ['id', 'name', 'anchor', 'group', 'frame', '_num']) delete c[f];
+  Object.assign(c, translateGeom(src, dx, dy));
+  c.page = k;
+  const a = newAnnot({ ...c, created: new Date(), modified: new Date() });
+  // a cópia continua no "clipboard": dá para colar várias vezes
+  toast(`${TYPE_LABELS[a.type]} colado(a) na página ${k + 1}.`, false, 2000);
+  return true;
+}
+
 function newAnnot(props) {
   const now = new Date();
   const a = {
@@ -1635,6 +1698,8 @@ epages.addEventListener('pointerdown', (e) => {
   }
   if (hit && E.tool === 'select') {
     e.preventDefault();
+    // clicar no comentário tira o cursor da caixa de texto (assim Ctrl+C/X/V agem sobre o comentário)
+    if (props.contains(document.activeElement)) document.activeElement.blur();
     const handle = e.target.closest('.handle');
     const id = handle ? handle.dataset.handle : hit.closest('[data-id]')?.dataset.id;
     if (!id) return;
@@ -1721,6 +1786,11 @@ epages.addEventListener('pointerout', (e) => {
   if (to !== tipId) hideAnnTip();
 });
 epages.addEventListener('pointermove', (e) => { if (tipId && !E.drag) moveAnnTip(e.clientX, e.clientY); });
+epages.addEventListener('pointermove', (e) => {
+  const pel = e.target.closest?.('.epage');
+  E.mouse = pel ? { i: +pel.dataset.i, pt: evtPoint(e, pel) } : null;
+});
+epages.addEventListener('pointerleave', () => { E.mouse = null; });
 epages.addEventListener('pointerdown', hideAnnTip, true);
 escroll.addEventListener('scroll', hideAnnTip, { passive: true });
 
@@ -2691,6 +2761,12 @@ document.addEventListener('keydown', (e) => {
     if (e.key === '0' && !mod) { e.preventDefault(); fitWholePage(); return; }
     if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && !mod)) { e.preventDefault(); gotoEditorPage(navBase() - 1); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && E.selId) { e.preventDefault(); deleteAnnot(E.selId); return; }
+    if (mod && !e.shiftKey && !e.altKey) {
+      const k = e.key.toLowerCase();
+      const textSel = !window.getSelection()?.isCollapsed;
+      if ((k === 'c' || k === 'x') && E.selId && !textSel) { e.preventDefault(); copyAnnot(k === 'x'); return; }
+      if (k === 'v' && E.clip) { e.preventDefault(); pasteAnnot(); return; }
+    }
     if (!mod && TOOL_KEYS[e.key.toLowerCase()]) { setTool(TOOL_KEYS[e.key.toLowerCase()]); return; }
     return;
   }

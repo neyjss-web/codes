@@ -200,7 +200,12 @@ svg.ann .handle { fill: var(--accent); stroke: #fff; stroke-width: 1px; vector-e
 .tool:hover { border-color: var(--border); }
 .tool.active { background: var(--accent-soft); border-color: var(--accent); }
 #tool-color { width: 100%; height: 30px; border: none; background: none; cursor: pointer; }
-.ed-center { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.ed-center { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+#ed-wait {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 5; pointer-events: none;
+  padding: 6px 14px; border-radius: 999px; font-size: 12px; background: rgb(20 24 32 / 0.82); color: #fff; box-shadow: var(--shadow);
+}
+#ed-wait[hidden] { display: none; }
 .ed-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .ed-bar .sep { width: 1px; height: 22px; background: var(--border); }
 .ed-bar .grow { flex: 1; }

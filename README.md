@@ -76,7 +76,7 @@ quer salvar o FDF ou o PDF antes de fechar.
 | **Marcar várias páginas** | Clique nas páginas (ou digite `15-24, 30`) e use **Marcar seleção com comentário…**. |
 | **Ler e comentar** | Clique duplo numa página abre a leitura, sempre com a **página inteira** na tela. As setas `←` `→` mudam de página. `Ctrl + "+"` / `Ctrl + "-"` (ou ⟳ ⟲) giram a visualização em 90°. |
 | **Ferramentas** | Nota, texto, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
-| **Texto do comentário** | Só **negrito** (`Ctrl+B`) e **vermelho**, sempre na mesma fonte. Clique duplo num comentário abre a edição. |
+| **Texto do comentário** | Só **negrito** (`Ctrl+B`) e **vermelho**, sempre na mesma fonte. Clique duplo num comentário abre a edição. `Ctrl+C`, `Ctrl+X` e `Ctrl+V` copiam, recortam e colam o comentário selecionado. |
 | **Encontrar** | Busca no texto com **próxima/anterior ocorrência**, abas de **Comentários** e **Marcadores** do PDF, e links que funcionam. |
 | **PJe** | Botão **Copiar Num.** copia "2177293507 - Pág. 1" da página atual. |
 | **Salvar** | **Salvar PDF** (`Ctrl+S`) grava os comentários **dentro do próprio arquivo aberto**. **Salvar como…** (`Ctrl+Shift+S`) grava em outro arquivo. **Salvar/Carregar FDF** guarda e recupera só os comentários, pela janela "Salvar como" do Windows. O app não usa os downloads do navegador. |

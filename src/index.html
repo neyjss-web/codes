@@ -136,6 +136,7 @@
       <button class="btn" id="ed-close" title="Fechar e voltar à grade de páginas (Esc)"><span class="lbl">Fechar </span>✕</button>
     </div>
     <div class="ed-scroll" tabindex="-1"><div class="epages tool-select"></div></div>
+    <div id="ed-wait" role="status" hidden></div>
   </div>
   <div class="ed-side">
     <div class="side-tabs" role="tablist"><button type="button" data-tab="comments">Comentários</button><button type="button" data-tab="outline">Marcadores</button></div>
@@ -233,6 +234,7 @@
       <tr><td>Clique duplo no comentário</td><td>Abre a edição do texto do comentário</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>No texto do comentário: negrito / vermelho</td></tr>
       <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>X</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Copia / recorta o comentário selecionado; cola onde está o mouse</td></tr>
     </table>
     <p class="hint">Realçar/Sublinhar/Tachar: selecione o texto com a ferramenta ativa, ou arraste um retângulo em áreas sem texto.
       As marcações de grupo são gravadas como notas padrão do PDF (com moldura opcional) e exportadas no FDF com identificador

@@ -49,7 +49,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Sempre mostrar a página inteira ao navegar | Setas `←` `→`, PageUp/PageDown, ▲ ▼, comentários, marcadores, links e busca sempre mostram a página inteira, mesmo depois de usar o zoom. |
 | Girar a página de 90 em 90 graus | `Ctrl + "+"` gira para a direita e `Ctrl + "-"` para a esquerda (botões ⟳ ⟲ na visão de página). Vale para a grade e para a visão de página. Só muda a exibição: o PDF salvo não é girado. |
 | Página nítida | A página é desenhada com exatamente os pixels da tela e alinhada a eles, em qualquer escala do Windows (100%, 125%, 150%, 250%…). Assim a imagem não é esticada nem fica meio pixel deslocada, o que a deixava embaçada. |
-| Troca de página sem "piscar" | A página nova é desenhada fora da tela e só aparece pronta. Se ainda não estiver pronta, a página atual continua visível até ela ficar pronta (no máximo 1,5 s). Num reajuste de zoom, as páginas já desenhadas continuam na tela até a nova versão ficar pronta. A página de destino é sempre desenhada primeiro. |
+| Troca de página sem "piscar" | A página nova é desenhada fora da tela e só aparece pronta. Se ainda não estiver pronta, a página atual continua visível até ela ficar pronta (no máximo 6 s), com o aviso "Carregando página…" se demorar. Enquanto você lê, o app já desenha a próxima, a seguinte e a anterior. O desenho usa a placa de vídeo, o que deixa as páginas digitalizadas (imagens pesadas) prontas mais rápido e sem travar a tela. Num reajuste de zoom, as páginas já desenhadas continuam na tela até a nova versão ficar pronta. A página de destino é sempre desenhada primeiro. |
 | Botão "Página inteira" (no lugar de "Largura") | Botão **Página inteira** (ou tecla `0`). |
 | Ver o texto do PDF | O texto pode ser selecionado e copiado. O botão **Copiar texto** copia a página atual. |
 | Copiar o "Num." do PJe | **Copiar Num.** copia, por exemplo, `2177293507 - Pág. 1`, lido do rodapé da página. |
@@ -78,6 +78,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Clique duplo no ícone abre a edição | O cursor vai para o **fim** do texto do comentário, sem selecionar nada. |
 | Copiar texto sem formatação | Copiar (`Ctrl+C`, `Ctrl+X` ou o menu de contexto) leva só o texto puro, **numa linha só**: sem fontes, cores ou estilos, sem quebras de linha e sem espaços duplos. Vale para o texto do PDF e o dos comentários. Colar num comentário também junta o texto numa linha. |
 | Formatação | Só **negrito** (`Ctrl+B`) e **vermelho** (botão **A** ou `Ctrl+Shift+X`). Itálico, sublinhado, outras fontes e cores são bloqueados, e texto colado entra sem formatação. A fonte é sempre a mesma. |
+| Copiar, recortar e colar comentários | Selecione o ícone do comentário e use `Ctrl+C` (copiar) ou `Ctrl+X` (recortar). `Ctrl+V` cola onde está o mouse, em qualquer página; sem o mouse sobre uma página, cola na página atual. O comentário colado ganha o vínculo ao "Num." da nova página. `Ctrl+Z` desfaz. |
 | Revisar ao abrir | Ao abrir comentários (do PDF ou de um FDF), todos são revisados: ganham o vínculo ao "Num." (item 4) e perdem qualquer formatação que não seja negrito ou vermelho. Um aviso resume o que mudou. |
 
 ## 4. Vínculo ao "Num." do PJe (o principal diferencial)
@@ -128,5 +129,6 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | `V N T H U K R E D` | Ferramentas: Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho |
 | `Ctrl+B` / `Ctrl+Shift+X` | Negrito / vermelho no texto do comentário |
 | `Del` | Excluir o comentário selecionado |
+| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copiar / recortar o comentário selecionado; colar onde está o mouse |
 | `Ctrl+Z` / `Ctrl+Y` | Desfazer / refazer |
 | `Ctrl+S` / `Ctrl+Shift+S` | Gravar os comentários no PDF aberto / Salvar como outro arquivo |
