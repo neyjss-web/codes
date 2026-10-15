@@ -47,6 +47,8 @@ const DOC_OPTIONS = {
 
 const ZOOMS = [60, 80, 100, 120, 145, 170, 200, 240, 290, 350, 420, 500, 600, 720, 860, 1000, 1200, 1400];
 const DPR = () => Math.min(window.devicePixelRatio || 1, 2);
+// Na leitura contínua, usa a densidade real da tela (até 3x) para o texto ficar nítido
+const DPRE = () => Math.min(window.devicePixelRatio || 1, 3);
 
 const S = {
   fileName: '',
@@ -969,6 +971,8 @@ async function showPreview(i) {
   let pageW = pageH * vp.width / vp.height;
   const maxW = W * 0.5 - 40;
   if (pageW > maxW) { pageW = maxW; pageH = pageW * vp.height / vp.width; }
+  // pixels inteiros da tela (a imagem não é esticada)
+  { const dd = DPR(); pageW = Math.floor(pageW * dd) / dd; pageH = Math.round(pageW * vp.height / vp.width * dd) / dd; }
   // Se a miniatura já é tão grande quanto a lupa, não há o que ampliar
   if (pageEl(i).offsetWidth >= pageW * 0.85) { hidePreview(); return; }
   pv.i = i;
@@ -1099,12 +1103,18 @@ function buildEditorPages(anchor, ratio = 0) {
     const el = document.createElement('div');
     el.className = 'epage';
     el.dataset.i = i;
-    el.style.width = `${Math.round(S.vps[i].width * E.scale)}px`;
-    el.style.height = `${Math.round(S.vps[i].height * E.scale)}px`;
+    // Tamanho em pixels reais da tela (inteiros), para a imagem da página não ser esticada (nitidez)
+    const d = DPRE();
+    const wd = Math.round(S.vps[i].width * E.scale * d), hd = Math.round(S.vps[i].height * E.scale * d);
+    el.dataset.wd = wd;
+    el.dataset.hd = hd;
+    el.style.width = `${wd / d}px`;
+    el.style.height = `${hd / d}px`;
     el.innerHTML = `<span class="epno">${i + 1}</span>`;
     frag.append(el);
   }
   epages.append(frag);
+  layoutEPages();
   E.io = new IntersectionObserver((entries) => {
     for (const en of entries) {
       const i = +en.target.dataset.i;
@@ -1128,8 +1138,9 @@ async function renderEPage(i) {
   E.pages.set(i, st);
   const el = epageEl(i);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(st.vp.width * DPR());
-  canvas.height = Math.round(st.vp.height * DPR());
+  // exatamente os pixels da tela ocupados pela página (sem reamostragem = sem embaçar)
+  canvas.width = +el.dataset.wd || Math.round(st.vp.width * DPRE());
+  canvas.height = +el.dataset.hd || Math.round(st.vp.height * DPRE());
   const tl = document.createElement('div');
   tl.className = 'textLayer';
   tl.style.setProperty('--total-scale-factor', E.scale);
@@ -1142,7 +1153,7 @@ async function renderEPage(i) {
   try {
     const page = await S.pdf.getPage(i + 1);
     if (gen !== E.gen || E.pages.get(i) !== st) return;
-    st.task = page.render({ canvas, viewport: page.getViewport({ scale: E.scale * DPR(), rotation: rotOf(page) }) });
+    st.task = page.render({ canvas, viewport: page.getViewport({ scale: canvas.width / S.vps[i].width, rotation: rotOf(page) }) });
     await st.task.promise;
     if (gen !== E.gen || E.pages.get(i) !== st) return;
     const links = await getLinks(i);
@@ -1213,6 +1224,16 @@ function setCurrentPage(i, force = false) {
   $(`#ed-list .pg-h[data-p="${i}"]`)?.classList.add('cur');
 }
 
+// Centraliza cada página numa posição de pixel inteiro da tela (meio pixel de deslocamento embaça)
+function layoutEPages() {
+  const d = DPRE();
+  const cw = epages.clientWidth * d;
+  for (const el of epages.children) {
+    const wd = +el.dataset.wd || 0;
+    el.style.marginLeft = `${Math.max(0, Math.floor((cw - wd) / 2)) / d}px`;
+  }
+}
+
 // Escala em que a página i cabe inteira na área visível
 function fitScaleFor(i) {
   const vp = S.vps[i];
@@ -1222,10 +1243,11 @@ function fitScaleFor(i) {
 // Se a área visível mudar de tamanho (janela, barra que quebra linha), refaz o ajuste de página inteira
 let fitRaf = 0;
 new ResizeObserver(() => {
-  if (!E.open || !E.fit || fitRaf) return;
+  if (!E.open || fitRaf) return;
   fitRaf = requestAnimationFrame(() => {
     fitRaf = 0;
     if (E.open && E.fit && Math.abs(fitScaleFor(E.i) - E.scale) > 0.005) buildEditorPages(E.i, 0);
+    else if (E.open) layoutEPages();
   });
 }).observe(escroll);
 
@@ -1806,11 +1828,14 @@ rcEd.addEventListener('keydown', (e) => {
 });
 rcEd.addEventListener('paste', (e) => {
   e.preventDefault();
-  const t = e.clipboardData?.getData('text/plain') || '';
-  document.execCommand('insertText', false, t); // cola sem formatação
+  const t = cleanText(e.clipboardData?.getData('text/plain') || '');
+  document.execCommand('insertText', false, t); // cola sem formatação, sem quebras e sem espaços duplos
 });
 rcEd.addEventListener('drop', (e) => e.preventDefault());
 document.addEventListener('selectionchange', updateRcButtons);
+
+// Texto puro numa linha só: sem formatação, sem quebras de linha e sem espaços duplos
+const cleanText = (t) => String(t).replace(/[\u200b-\u200d\ufeff]/g, '').replace(/\s+/g, ' ').trim();
 
 // Copiar/recortar texto selecionado (Ctrl+C, Ctrl+X ou menu de contexto): só texto puro, sem formatação
 function plainSelectionText() {
@@ -1818,7 +1843,7 @@ function plainSelectionText() {
   if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return null; // campos comuns já são texto puro
   const sel = window.getSelection();
   if (!sel || sel.isCollapsed) return null;
-  return sel.toString().replace(/\u00a0/g, ' ').replace(/[\u200b-\u200d\ufeff]/g, '');
+  return cleanText(sel.toString());
 }
 document.addEventListener('copy', (e) => {
   const t = plainSelectionText();

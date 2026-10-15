@@ -48,6 +48,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Páginas em sequência, com rolagem | Todas as páginas, uma abaixo da outra. |
 | Sempre mostrar a página inteira ao navegar | Setas `←` `→`, PageUp/PageDown, ▲ ▼, comentários, marcadores, links e busca sempre mostram a página inteira, mesmo depois de usar o zoom. |
 | Girar a página de 90 em 90 graus | `Ctrl + "+"` gira para a direita e `Ctrl + "-"` para a esquerda (botões ⟳ ⟲ na visão de página). Vale para a grade e para a visão de página. Só muda a exibição: o PDF salvo não é girado. |
+| Página nítida | A página é desenhada com exatamente os pixels da tela e alinhada a eles, em qualquer escala do Windows (100%, 125%, 150%, 250%…). Assim a imagem não é esticada nem fica meio pixel deslocada, o que a deixava embaçada. |
 | Botão "Página inteira" (no lugar de "Largura") | Botão **Página inteira** (ou tecla `0`). |
 | Ver o texto do PDF | O texto pode ser selecionado e copiado. O botão **Copiar texto** copia a página atual. |
 | Copiar o "Num." do PJe | **Copiar Num.** copia, por exemplo, `2177293507 - Pág. 1`, lido do rodapé da página. |
@@ -74,7 +75,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Tipos de comentário | Nota, texto livre, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
 | Ver o conteúdo ao passar o mouse | Pop-up com o texto, o autor, a data e a página. |
 | Clique duplo no ícone abre a edição | O cursor vai para o **fim** do texto do comentário, sem selecionar nada. |
-| Copiar texto sem formatação | Copiar (`Ctrl+C`, `Ctrl+X` ou o menu de contexto) leva só o texto puro, sem fontes, cores ou estilos, tanto do texto do PDF quanto do texto dos comentários. |
+| Copiar texto sem formatação | Copiar (`Ctrl+C`, `Ctrl+X` ou o menu de contexto) leva só o texto puro, **numa linha só**: sem fontes, cores ou estilos, sem quebras de linha e sem espaços duplos. Vale para o texto do PDF e o dos comentários. Colar num comentário também junta o texto numa linha. |
 | Formatação | Só **negrito** (`Ctrl+B`) e **vermelho** (botão **A** ou `Ctrl+Shift+X`). Itálico, sublinhado, outras fontes e cores são bloqueados, e texto colado entra sem formatação. A fonte é sempre a mesma. |
 | Revisar ao abrir | Ao abrir comentários (do PDF ou de um FDF), todos são revisados: ganham o vínculo ao "Num." (item 4) e perdem qualquer formatação que não seja negrito ou vermelho. Um aviso resume o que mudou. |
 
