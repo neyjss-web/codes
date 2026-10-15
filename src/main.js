@@ -255,14 +255,14 @@ async function openPdf(file, target = null) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, target, fdfHandle: null, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '',
+      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
     for (let i = 1; i <= S.n; i++) {
       const page = await pdf.getPage(i);
       if (gen !== S.gen) return;
-      S.vps.push(page.getViewport({ scale: 1 }));
+      S.vps.push(page.getViewport({ scale: 1, rotation: rotOf(page) }));
       if (i % 25 === 0) { progress(0.35 + 0.6 * (i / S.n), `Preparando páginas… ${i}/${S.n}`); await nextPaint(); }
     }
     S.annots = annots.filter((a) => a.page < S.n);
@@ -293,6 +293,30 @@ async function openPdf(file, target = null) {
 // ============================================================================
 // Grade contínua de páginas
 // ============================================================================
+
+// ---- Giro da visualização (90° em 90°): só a exibição; o PDF salvo não é alterado ----
+const rotOf = (page) => (((page.rotate || 0) + (S.rot || 0)) % 360 + 360) % 360;
+
+async function rotateView(delta) {
+  if (!S.pdf) return;
+  S.rot = ((S.rot + delta) % 360 + 360) % 360;
+  const anchorPage = E.open ? E.i : topPageIndex() ?? 0;
+  const gen = S.gen;
+  const vps = [];
+  for (let i = 0; i < S.n; i++) {
+    const page = await S.pdf.getPage(i + 1);
+    if (gen !== S.gen) return;
+    vps.push(page.getViewport({ scale: 1, rotation: rotOf(page) }));
+  }
+  S.vps = vps;
+  pv.cache.clear();
+  hidePreview();
+  buildGrid();
+  const el = pageEl(anchorPage);
+  if (el) viewer.scrollTop = el.offsetTop - 14;
+  if (E.open) { E.fit = true; buildEditorPages(anchorPage, 0); }
+  toast(`Visualização girada: ${S.rot}°`, false, 1500);
+}
 
 const renderState = new Map(); // i -> { w, busy }
 const visible = new Set();
@@ -422,7 +446,7 @@ async function renderThumb(i, targetW) {
   renderState.set(i, st);
   try {
     const page = await S.pdf.getPage(i + 1);
-    const vp = page.getViewport({ scale: targetW / S.vps[i].width });
+    const vp = page.getViewport({ scale: targetW / S.vps[i].width, rotation: rotOf(page) });
     const canvas = document.createElement('canvas');
     canvas.className = 'pg';
     canvas.width = Math.round(vp.width);
@@ -998,7 +1022,7 @@ async function showPreview(i) {
     const off = document.createElement('canvas');
     off.width = cw;
     off.height = ch;
-    const task = page.render({ canvas: off, viewport: page.getViewport({ scale: cw / vp.width }) });
+    const task = page.render({ canvas: off, viewport: page.getViewport({ scale: cw / vp.width, rotation: rotOf(page) }) });
     pv.task = task;
     await task.promise;
     pv.cache.set(key, off);
@@ -1118,7 +1142,7 @@ async function renderEPage(i) {
   try {
     const page = await S.pdf.getPage(i + 1);
     if (gen !== E.gen || E.pages.get(i) !== st) return;
-    st.task = page.render({ canvas, viewport: page.getViewport({ scale: E.scale * DPR() }) });
+    st.task = page.render({ canvas, viewport: page.getViewport({ scale: E.scale * DPR(), rotation: rotOf(page) }) });
     await st.task.promise;
     if (gen !== E.gen || E.pages.get(i) !== st) return;
     const links = await getLinks(i);
@@ -1392,6 +1416,8 @@ $('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
 $('#ed-fit').onclick = fitWholePage;
+$('#ed-rot-l').onclick = () => rotateView(-90);
+$('#ed-rot-r').onclick = () => rotateView(90);
 function fitWholePage() { E.fit = true; buildEditorPages(E.i, 0); }
 // Número do documento no rodapé do PJe: "Num. 2177293507 - Pág. 1"
 async function getPageNum(i) {
@@ -1491,7 +1517,7 @@ epages.addEventListener('pointerdown', (e) => {
       E.lastHit = null;
       if (E.selId !== id) { E.selId = id; renderEditorOverlay(); }
       setSideTab('comments');
-      focusContents(true);
+      focusContents();
       return;
     }
     E.lastHit = { id, t: now };
@@ -1785,6 +1811,28 @@ rcEd.addEventListener('paste', (e) => {
 });
 rcEd.addEventListener('drop', (e) => e.preventDefault());
 document.addEventListener('selectionchange', updateRcButtons);
+
+// Copiar/recortar texto selecionado (Ctrl+C, Ctrl+X ou menu de contexto): só texto puro, sem formatação
+function plainSelectionText() {
+  const a = document.activeElement;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return null; // campos comuns já são texto puro
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed) return null;
+  return sel.toString().replace(/\u00a0/g, ' ').replace(/[\u200b-\u200d\ufeff]/g, '');
+}
+document.addEventListener('copy', (e) => {
+  const t = plainSelectionText();
+  if (t == null || !e.clipboardData) return;
+  e.clipboardData.setData('text/plain', t);
+  e.preventDefault();
+});
+document.addEventListener('cut', (e) => {
+  const t = plainSelectionText();
+  if (t == null || !e.clipboardData) return;
+  e.clipboardData.setData('text/plain', t);
+  e.preventDefault();
+  if (rcEd.contains(window.getSelection().anchorNode)) document.execCommand('delete');
+});
 
 function renderProps() {
   const a = S.annots.find((x) => x.id === E.selId);
@@ -2289,7 +2337,7 @@ async function closePdf() {
   Object.assign(S, {
     fileName: '', target: null, fdfHandle: null, bytes: null, pdf: null, task: null, n: 0, vps: [], annots: [], groups: [],
     sel: new Set(), lastClicked: null, canWrite: false, trailerId: null, text: new Map(), links: new Map(), anchors: new Map(),
-    matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '', undo: [], redo: [],
+    matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '', undo: [], redo: [],
   });
   grid.innerHTML = '';
   $('#empty').hidden = false;
@@ -2481,6 +2529,9 @@ document.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (document.querySelector('dialog[open]')) return;
   if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); savePdf(e.shiftKey); return; }
+  // Ctrl + "+" / Ctrl + "-": gira a visualização 90° (em vez do zoom do navegador)
+  if (mod && !e.altKey && (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd')) { e.preventDefault(); rotateView(90); return; }
+  if (mod && !e.altKey && (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract')) { e.preventDefault(); rotateView(-90); return; }
   if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); openPdfDialog(); return; }
   if (e.key === 'Escape') {
     if (typing) { tgt.blur(); return; }

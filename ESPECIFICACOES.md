@@ -47,6 +47,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 |---|---|
 | Páginas em sequência, com rolagem | Todas as páginas, uma abaixo da outra. |
 | Sempre mostrar a página inteira ao navegar | Setas `←` `→`, PageUp/PageDown, ▲ ▼, comentários, marcadores, links e busca sempre mostram a página inteira, mesmo depois de usar o zoom. |
+| Girar a página de 90 em 90 graus | `Ctrl + "+"` gira para a direita e `Ctrl + "-"` para a esquerda (botões ⟳ ⟲ na visão de página). Vale para a grade e para a visão de página. Só muda a exibição: o PDF salvo não é girado. |
 | Botão "Página inteira" (no lugar de "Largura") | Botão **Página inteira** (ou tecla `0`). |
 | Ver o texto do PDF | O texto pode ser selecionado e copiado. O botão **Copiar texto** copia a página atual. |
 | Copiar o "Num." do PJe | **Copiar Num.** copia, por exemplo, `2177293507 - Pág. 1`, lido do rodapé da página. |
@@ -72,7 +73,8 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 |---|---|
 | Tipos de comentário | Nota, texto livre, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
 | Ver o conteúdo ao passar o mouse | Pop-up com o texto, o autor, a data e a página. |
-| Clique duplo no ícone abre a edição | O cursor vai direto para o texto do comentário. |
+| Clique duplo no ícone abre a edição | O cursor vai para o **fim** do texto do comentário, sem selecionar nada. |
+| Copiar texto sem formatação | Copiar (`Ctrl+C`, `Ctrl+X` ou o menu de contexto) leva só o texto puro, sem fontes, cores ou estilos, tanto do texto do PDF quanto do texto dos comentários. |
 | Formatação | Só **negrito** (`Ctrl+B`) e **vermelho** (botão **A** ou `Ctrl+Shift+X`). Itálico, sublinhado, outras fontes e cores são bloqueados, e texto colado entra sem formatação. A fonte é sempre a mesma. |
 | Revisar ao abrir | Ao abrir comentários (do PDF ou de um FDF), todos são revisados: ganham o vínculo ao "Num." (item 4) e perdem qualquer formatação que não seja negrito ou vermelho. Um aviso resume o que mudou. |
 
@@ -116,6 +118,7 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | `<` / `>` | Páginas menores / maiores (na visão de página: zoom) |
 | `←` `→` ou PageUp/PageDown | Página anterior / próxima (visão de página) |
 | `0` | Página inteira |
+| `Ctrl + "+"` / `Ctrl + "-"` | Girar a visualização 90° à direita / à esquerda |
 | `Ctrl+F`, `F3` / `Shift+F3` | Buscar; próxima / anterior ocorrência |
 | `Ctrl+A` / `Esc` | Selecionar todas as páginas / limpar a seleção |
 | `M` | Marcar as páginas selecionadas com um comentário |

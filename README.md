@@ -74,7 +74,7 @@ quer salvar o FDF ou o PDF antes de fechar.
 | **Ver o processo inteiro** | Páginas em miniatura, 4 por linha ao abrir. Os botões **− Menores / + Maiores** (ou as teclas `<` e `>`) mudam o tamanho. |
 | **Lupa** | Passe o mouse sobre uma página para vê-la ampliada, com os comentários destacados. |
 | **Marcar várias páginas** | Clique nas páginas (ou digite `15-24, 30`) e use **Marcar seleção com comentário…**. |
-| **Ler e comentar** | Clique duplo numa página abre a leitura, sempre com a **página inteira** na tela. As setas `←` `→` mudam de página. |
+| **Ler e comentar** | Clique duplo numa página abre a leitura, sempre com a **página inteira** na tela. As setas `←` `→` mudam de página. `Ctrl + "+"` / `Ctrl + "-"` (ou ⟳ ⟲) giram a visualização em 90°. |
 | **Ferramentas** | Nota, texto, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
 | **Texto do comentário** | Só **negrito** (`Ctrl+B`) e **vermelho**, sempre na mesma fonte. Clique duplo num comentário abre a edição. |
 | **Encontrar** | Busca no texto com **próxima/anterior ocorrência**, abas de **Comentários** e **Marcadores** do PDF, e links que funcionam. |
