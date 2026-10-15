@@ -2,6 +2,7 @@
 // quanto para objetos pdf-lib. Valores: número, boolean, {name}, {text}, {date}, array.
 
 import { toPdfDate, fromPdfDate, pdfColorToRgb, finalizeImported, MANAGED_TYPES, nmWithAnchor } from './model.js';
+import { hasFormatting, runsToPlain, runsToRC, rcToRuns } from './richtext.js';
 
 export const N = (name) => ({ name });
 export const T = (text) => ({ text });
@@ -21,6 +22,8 @@ export function annotEntries(a) {
     ['C', (a.color || [1, 0.83, 0]).slice()],
   ];
   if (a.contents) e.push(['Contents', T(a.contents)]);
+  // Texto rico (negrito/vermelho) no campo padrão /RC
+  if (a.contents && hasFormatting(a.runs) && runsToPlain(a.runs) === a.contents) e.push(['RC', T(runsToRC(a.runs))]);
   if (a.author) e.push(['T', T(a.author)]);
   if (a.subject) e.push(['Subj', T(a.subject)]);
   if (a.opacity != null && a.opacity < 1) e.push(['CA', a.opacity]);
@@ -93,6 +96,16 @@ export function annotFromAccessor(get, page) {
     created: fromPdfDate(str(get('CreationDate'))),
     modified: fromPdfDate(str(get('M'))),
   };
+  // /RC: mantém só negrito e vermelho, e só se o texto bater com /Contents
+  const rc = str(get('RC'));
+  if (rc) {
+    const runs = rcToRuns(rc);
+    const norm = (x) => x.replace(/\s+/g, ' ').trim();
+    if (hasFormatting(runs) && norm(runsToPlain(runs)) === norm(a.contents)) {
+      a.runs = runs;
+      a.contents = runsToPlain(runs);
+    }
+  }
   const bs = get('BS');
   const bw = Array.isArray(bs) ? null : bs && typeof bs === 'object' && 'W' in bs ? bs.W : null;
   if (typeof bw === 'number') a.borderWidth = bw;

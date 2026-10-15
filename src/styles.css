@@ -399,3 +399,23 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
   .ed-bar { padding: 6px; gap: 3px; }
   .ed-search input { width: 76px; }
 }
+
+/* Editor do comentário: só negrito e vermelho, sempre na mesma fonte */
+.rc-field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.rc-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.rc-bar { display: inline-flex; gap: 3px; }
+.rc-btn { border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 5px; min-width: 26px; height: 24px; padding: 0 6px; cursor: pointer; font-size: 12px; }
+.rc-btn:hover { border-color: var(--accent); }
+.rc-btn.on { background: var(--accent-soft); border-color: var(--accent); }
+.rc-red-btn { color: #d00000; font-weight: 700; }
+.rc {
+  min-height: 84px; max-height: 260px; overflow: auto; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel-2); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; outline: none;
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.rc:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.rc *, .item .c *, #ann-tip .tip-c *, .pv-list * { font: inherit; }
+.rc b, .rc strong, .item .c strong, #ann-tip .tip-c strong, .pv-list strong, svg.ann .ft strong { font-weight: 700; }
+.rc-red, .rc .rc-red { color: #d00000; }
+:root[data-theme="dark"] .rc-red { color: #ff6b6b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rc .rc-red, :root:not([data-theme="light"]) .item .c .rc-red { color: #ff6b6b; } }

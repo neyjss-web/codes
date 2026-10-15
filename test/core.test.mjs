@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { PDFDocument } from 'pdf-lib';
 import { exportFDF, importFDF } from '../src/fdf.js';
 import { buildAnnotatedPdf, loadPdfLib, readAnnotations, stripAnnotations } from '../src/pdfannots.js';
+import { runsToPlain, normalizeRuns, rcToRuns } from '../src/richtext.js';
 import { finalizeImported, groupNM, rebuildGroups, parsePageRanges, formatPageRanges, findNumPag } from '../src/model.js';
 
 function sample() {
@@ -128,4 +129,24 @@ test('findNumPag lê o rodapé do PJe', () => {
   assert.deepEqual(findNumPag('blá Num. 2177293507 - Pág. 12 fim'), { num: '2177293507', pag: 12 });
   assert.deepEqual(findNumPag('Num. 834877049 – Pag. 1'), { num: '834877049', pag: 1 });
   assert.equal(findNumPag('sem rodapé'), null);
+});
+
+test('texto rico: negrito e vermelho no /RC (FDF e PDF) e leitura do RC do Acrobat', async () => {
+  const runs = [{ t: 'Despacho de ', b: false, r: false }, { t: 'intimação', b: true, r: false }, { t: ' das executadas\nprazo ', b: false, r: false }, { t: '15 dias', b: true, r: true }];
+  const a = finalizeImported({ type: 'Text', page: 0, rect: [10, 10, 30, 30], contents: runsToPlain(runs), runs, name: 'rc1' });
+  const fdfText = new TextDecoder('latin1').decode(exportFDF([a]));
+  assert.match(fdfText, /\/RC /);
+  const back = importFDF(exportFDF([a])).annots[0];
+  assert.equal(back.contents, 'Despacho de intimação das executadas\nprazo 15 dias');
+  assert.deepEqual(back.runs, normalizeRuns(runs));
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]);
+  const fromPdf = readAnnotations(await loadPdfLib(await buildAnnotatedPdf(await doc.save(), [a])))[0];
+  assert.deepEqual(fromPdf.runs, normalizeRuns(runs));
+  // RC no estilo do Acrobat: itálico e fonte são descartados; negrito e vermelho mantidos
+  const acro = '<?xml version="1.0"?><body xmlns="http://www.w3.org/1999/xhtml" style="font-size:12pt;color:#000000"><p dir="ltr"><span style="font-style:italic;font-family:Times">Olá </span><span style="font-weight:bold">mundo</span></p><p><span style="color:#FF0000">vermelho &amp; fim</span></p></body>';
+  assert.deepEqual(rcToRuns(acro), [{ t: 'Olá ', b: false, r: false }, { t: 'mundo', b: true, r: false }, { t: '\n', b: false, r: false }, { t: 'vermelho & fim', b: false, r: true }]);
+  // sem formatação útil: não grava /RC
+  const plain = finalizeImported({ type: 'Text', page: 0, rect: [0, 0, 20, 20], contents: 'simples', name: 'p1' });
+  assert.doesNotMatch(new TextDecoder('latin1').decode(exportFDF([plain])), /\/RC /);
 });

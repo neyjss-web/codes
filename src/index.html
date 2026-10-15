@@ -136,7 +136,17 @@
     <div class="pane" data-pane="comments">
     <form id="props" hidden autocomplete="off">
       <h3><span id="props-title">Propriedades</span> <button type="button" class="x" id="props-close" title="Fechar propriedades">✕</button></h3>
-      <label>Comentário<textarea name="contents" rows="4"></textarea></label>
+      <div class="rc-field">
+        <div class="rc-head">
+          <span>Comentário</span>
+          <span class="rc-bar">
+            <button type="button" class="rc-btn" data-cmd="bold" title="Negrito (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="rc-btn rc-red-btn" data-cmd="red" title="Destaque em vermelho (Ctrl+Shift+X)">A</button>
+            <button type="button" class="rc-btn" data-cmd="clear" title="Remover negrito e vermelho do trecho selecionado">Limpar</button>
+          </span>
+        </div>
+        <div id="rc-editor" class="rc" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Comentário" spellcheck="true"></div>
+      </div>
       <label>Autor<input name="author"></label>
       <label>Assunto<input name="subject"></label>
       <div class="row">
@@ -213,6 +223,8 @@
       <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
       <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd> ou <kbd>←</kbd> / <kbd>→</kbd></td><td>Página anterior / próxima</td></tr>
       <tr><td><kbd>0</kbd></td><td>Página inteira na tela</td></tr>
+      <tr><td>Clique duplo no comentário</td><td>Abre a edição do texto do comentário</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>No texto do comentário: negrito / vermelho</td></tr>
       <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>
     </table>
     <p class="hint">Realçar/Sublinhar/Tachar: selecione o texto com a ferramenta ativa, ou arraste um retângulo em áreas sem texto.

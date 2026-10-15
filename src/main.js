@@ -6,6 +6,7 @@ import {
 import { exportFDF, importFDF } from './fdf.js';
 import { loadPdfLib, readAnnotations, stripAnnotations, writeAnnotations, getTrailerId } from './pdfannots.js';
 import { quadsBBox } from './annotdict.js';
+import { runsToHtml, runsToPlain, domToRuns, hasFormatting, isRed } from './richtext.js';
 
 // ============================================================================
 // Configuração do pdf.js (worker e dados binários embutidos no HTML)
@@ -509,7 +510,7 @@ function buildAnnotSvg(i, opts = {}) {
         const div = document.createElement('div');
         div.className = 'ft';
         div.style.cssText = `font-size:${a.fontSize || 12}px;color:${col};padding:2px;width:${w}px;height:${h}px;opacity:${op}`;
-        div.textContent = a.contents;
+        div.innerHTML = runsToHtml(a.runs, a.contents);
         fo.append(div);
         if (!a.contents && opts.interactive) svgEl('rect', { x: x1, y: y1, width: w, height: h, fill: 'none', stroke: '#999', 'stroke-dasharray': '3 2', 'stroke-width': 0.8 }, g);
         svgEl('rect', { class: 'hit', x: x1, y: y1, width: w, height: h }, g);
@@ -887,13 +888,13 @@ function annotItem(a, withPage) {
   const meta = [withPage ? `p. ${a.page + 1}` : null, TYPE_LABELS[a.type], a.author, fmtDate(a.modified)].filter(Boolean).map(esc).join(' · ');
   it.innerHTML = `<span class="dot" style="background:${rgbCss(a.type === 'FreeText' ? a.color : a.color)}"></span>
     <span class="t">${meta}</span><span class="acts"><button data-act="del" title="Excluir">🗑</button></span>
-    ${a.contents ? `<div class="c">${esc(a.contents)}</div>` : ''}`;
+    ${a.contents ? `<div class="c">${runsToHtml(a.runs, a.contents)}</div>` : ''}`;
   it.onclick = (e) => {
     if (e.target.closest('button')?.dataset.act === 'del') { deleteAnnot(a.id); return; }
     if (E.open) revealAnnot(a.id);
     else scrollToPage(a.page);
   };
-  it.ondblclick = () => { if (!E.open) openEditor(a.page, a.id); };
+  it.ondblclick = () => { if (!E.open) openEditor(a.page, a.id); else { revealAnnot(a.id); focusContents(); } };
   return it;
 }
 
@@ -971,7 +972,7 @@ async function showPreview(i) {
   for (const a of svg._numbered.slice(0, 6)) {
     const g = a.group ? S.groups.find((x) => x.id === a.group) : null;
     const label = g ? `[${g.label}] ` : a.subject && a.subject !== 'Nota' ? `[${a.subject}] ` : '';
-    ol.insertAdjacentHTML('beforeend', `<li><b>${a._num}</b><span>${esc(label)}${esc(a.contents || TYPE_LABELS[a.type])}${a.author ? ` <i class="muted">— ${esc(a.author)}</i>` : ''}</span></li>`);
+    ol.insertAdjacentHTML('beforeend', `<li><b>${a._num}</b><span>${esc(label)}${a.contents ? runsToHtml(a.runs, a.contents) : esc(TYPE_LABELS[a.type])}${a.author ? ` <i class="muted">— ${esc(a.author)}</i>` : ''}</span></li>`);
   }
   if (svg._numbered.length > 6) ol.insertAdjacentHTML('beforeend', `<li><span class="muted">… mais ${svg._numbered.length - 6}</span></li>`);
   box.hidden = false;
@@ -1482,6 +1483,16 @@ epages.addEventListener('pointerdown', (e) => {
     const handle = e.target.closest('.handle');
     const id = handle ? handle.dataset.handle : hit.closest('[data-id]')?.dataset.id;
     if (!id) return;
+    // Clique duplo no comentário: abre direto a edição do texto
+    const now = performance.now();
+    if (E.lastHit && E.lastHit.id === id && now - E.lastHit.t < 450) {
+      E.lastHit = null;
+      if (E.selId !== id) { E.selId = id; renderEditorOverlay(); }
+      setSideTab('comments');
+      focusContents(true);
+      return;
+    }
+    E.lastHit = { id, t: now };
     if (E.selId !== id) { E.selId = id; renderEditorOverlay(); }
     const a = S.annots.find((x) => x.id === id);
     if (!a || a.frame) return;
@@ -1516,7 +1527,8 @@ function showAnnTip(a, x, y) {
   $('.tip-h', tip).innerHTML = head;
   const c = $('.tip-c', tip);
   const text = g && !a.contents ? g.text : a.contents;
-  c.textContent = text || '(comentário sem texto)';
+  if (text && text === a.contents) c.innerHTML = runsToHtml(a.runs, a.contents);
+  else c.textContent = text || '(comentário sem texto)';
   c.classList.toggle('vazio', !text);
   $('.tip-q', tip)?.remove();
   if (a._text) tip.insertAdjacentHTML('beforeend', `<div class="tip-q">“${esc(truncate(a._text, 200))}”</div>`);
@@ -1700,10 +1712,21 @@ function mergeLineRects(rects) {
   return out;
 }
 
-function focusContents() {
-  const ta = $('#props [name=contents]');
-  ta.focus({ preventScroll: true });
-  requestAnimationFrame(() => { if (document.activeElement !== ta) ta.focus({ preventScroll: true }); });
+// Coloca o cursor no fim do texto do comentário (selectAll: seleciona todo o texto)
+function focusContents(selectAll = false) {
+  const ed = $('#rc-editor');
+  const place = () => {
+    ed.focus({ preventScroll: true });
+    const r = document.createRange();
+    r.selectNodeContents(ed);
+    if (!selectAll) r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    updateRcButtons();
+  };
+  place();
+  requestAnimationFrame(() => { if (document.activeElement !== ed) place(); });
 }
 
 function deleteAnnot(id) {
@@ -1721,6 +1744,45 @@ function deleteAnnot(id) {
 
 // ---- Formulário de propriedades ----
 const props = $('#props');
+const rcEd = $('#rc-editor');
+
+// Negrito / vermelho / limpar no texto do comentário (demais formatações são bloqueadas)
+function rcCommand(cmd) {
+  if (document.activeElement !== rcEd) rcEd.focus();
+  document.execCommand('styleWithCSS', false, false);
+  if (cmd === 'bold') document.execCommand('bold');
+  else if (cmd === 'red') {
+    const red = isRed(document.queryCommandValue('foreColor'));
+    document.execCommand('foreColor', false, red ? getComputedStyle(rcEd).color : '#d00000');
+  } else if (cmd === 'clear') document.execCommand('removeFormat');
+  updateRcButtons();
+}
+
+function updateRcButtons() {
+  if (document.activeElement !== rcEd) return;
+  $('.rc-btn[data-cmd=bold]').classList.toggle('on', document.queryCommandState('bold'));
+  $('.rc-btn[data-cmd=red]').classList.toggle('on', isRed(document.queryCommandValue('foreColor')));
+}
+
+for (const b of $$('.rc-btn')) {
+  b.addEventListener('mousedown', (e) => e.preventDefault()); // mantém a seleção no texto
+  b.addEventListener('click', () => rcCommand(b.dataset.cmd));
+}
+rcEd.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (!mod) return;
+  const k = e.key.toLowerCase();
+  if (k === 'b') { e.preventDefault(); rcCommand('bold'); }
+  else if (k === 'x' && e.shiftKey) { e.preventDefault(); rcCommand('red'); }
+  else if (k === 'i' || k === 'u') e.preventDefault(); // itálico/sublinhado não são permitidos
+});
+rcEd.addEventListener('paste', (e) => {
+  e.preventDefault();
+  const t = e.clipboardData?.getData('text/plain') || '';
+  document.execCommand('insertText', false, t); // cola sem formatação
+});
+rcEd.addEventListener('drop', (e) => e.preventDefault());
+document.addEventListener('selectionchange', updateRcButtons);
 
 function renderProps() {
   const a = S.annots.find((x) => x.id === E.selId);
@@ -1728,8 +1790,9 @@ function renderProps() {
   if (!a) return;
   const g = a.group ? S.groups.find((x) => x.id === a.group) : null;
   $('#props-title').textContent = `${TYPE_LABELS[a.type]} — p. ${a.page + 1}` + (g ? ` — marcação “${g.label}”` : '');
-  if (document.activeElement?.form !== props) {
-    props.contents.value = a.contents || '';
+  if (!props.contains(document.activeElement) || props.dataset.for !== a.id) {
+    props.dataset.for = a.id;
+    rcEd.innerHTML = runsToHtml(a.runs, a.contents);
     props.author.value = a.author || '';
     props.subject.value = a.subject || '';
   }
@@ -1752,7 +1815,11 @@ props.addEventListener('input', (e) => {
   if (!a) return;
   if (E.pendingSnap) { S.undo.push(E.pendingSnap); S.redo.length = 0; E.pendingSnap = null; }
   const f = e.target.name;
-  if (f === 'contents' || f === 'author' || f === 'subject') a[f] = e.target.value;
+  if (e.target === rcEd) {
+    const runs = domToRuns(rcEd);
+    a.contents = runsToPlain(runs);
+    if (hasFormatting(runs)) a.runs = runs; else delete a.runs;
+  } else if (f === 'author' || f === 'subject') a[f] = e.target.value;
   else if (f === 'color') a.color = hexToRgb(e.target.value);
   else if (f === 'fontSize') a.fontSize = Math.max(4, +e.target.value || 12);
   else if (f === 'borderWidth') a.borderWidth = Math.max(0, +e.target.value || 0);
