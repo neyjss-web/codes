@@ -11,8 +11,8 @@ const exe = [process.env.CHROME_PATH, '/opt/pw-browsers/chromium-1194/chrome-lin
 const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 1500, height: 850 }, acceptDownloads: true });
 page.on('pageerror', (e) => console.log('pageerror', e.message));
-const ready = (name) => page.waitForFunction((n) => window.__pdfnotas.S.fileName === n && document.querySelector('#loading').hidden && document.querySelector('#progress').hidden, name, { timeout: 30000 });
-await page.goto(pathToFileURL(resolve('dist/PDFNotas.html')).href);
+const ready = (name) => page.waitForFunction((n) => window.__yaynotes.S.fileName === n && document.querySelector('#loading').hidden && document.querySelector('#progress').hidden, name, { timeout: 30000 });
+await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href);
 
 // Versão 1: marca a Contestação (p. 15–24) e cria uma nota na p. 17
 await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');
@@ -38,16 +38,16 @@ await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 
 // Versão 2 (2 páginas novas após a p. 6): carrega o FDF
 page.once('dialog', (d) => d.accept());
-await page.evaluate(() => window.__pdfnotas.S.dirty = false);
+await page.evaluate(() => window.__yaynotes.S.dirty = false);
 await page.setInputFiles('#open-pdf', 'samples/exemplo-v2.pdf');
 await ready('exemplo-v2.pdf');
 await page.setInputFiles('#import-fdf', fdf);
-await page.waitForFunction(() => window.__pdfnotas.S.annots.length > 0, null, { timeout: 30000 });
+await page.waitForFunction(() => window.__yaynotes.S.annots.length > 0, null, { timeout: 30000 });
 await page.waitForTimeout(300);
 const r = await page.evaluate(() => ({
-  nota: window.__pdfnotas.S.annots.filter((a) => /Nota da p. 17/.test(a.contents)).map((a) => a.page + 1),
-  grupo: window.__pdfnotas.S.groups.map((g) => [g.label, g.pages[0] + 1, g.pages[g.pages.length - 1] + 1, g.pages.length]),
-  antigas: window.__pdfnotas.S.annots.filter((a) => !a.group && !/Nota da p. 17/.test(a.contents)).map((a) => [a.contents, a.page + 1]),
+  nota: window.__yaynotes.S.annots.filter((a) => /Nota da p. 17/.test(a.contents)).map((a) => a.page + 1),
+  grupo: window.__yaynotes.S.groups.map((g) => [g.label, g.pages[0] + 1, g.pages[g.pages.length - 1] + 1, g.pages.length]),
+  antigas: window.__yaynotes.S.annots.filter((a) => !a.group && !/Nota da p. 17/.test(a.contents)).map((a) => [a.contents, a.page + 1]),
   avisos: [...document.querySelectorAll('.toast')].map((t) => t.textContent),
 }));
 console.log(JSON.stringify(r, null, 1));

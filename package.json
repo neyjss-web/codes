@@ -1,7 +1,7 @@
 {
-  "name": "pdf-notas",
+  "name": "yaynotes",
   "version": "1.0.0",
-  "description": "Leitor de PDF com edição de comentários e importação/exportação FDF",
+  "description": "YayNotes: leitor de processos do PJe em PDF para fazer e reaproveitar comentários (FDF), offline e sem instalação",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --serve",
@@ -29,5 +29,13 @@
     "playwright-core": "^1.56.1"
   },
   "type": "module",
-  "private": true
+  "private": true,
+  "keywords": [
+    "pdf",
+    "pje",
+    "fdf",
+    "anotações",
+    "comentários",
+    "processo judicial"
+  ]
 }

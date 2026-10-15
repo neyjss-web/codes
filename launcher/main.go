@@ -1,6 +1,6 @@
-// PDFNotas.exe — executável portátil para Windows (não requer instalação).
+// YayNotes.exe — executável portátil para Windows (não requer instalação).
 //
-// Contém o aplicativo (PDFNotas.html) embutido, serve-o apenas em 127.0.0.1 e o abre
+// Contém o aplicativo (YayNotes.html) embutido, serve-o apenas em 127.0.0.1 e o abre
 // numa janela própria do Microsoft Edge (ou Chrome). Se um PDF for passado como argumento
 // (arrastar o arquivo sobre o .exe, ou "Abrir com"), ele é carregado automaticamente.
 package main
@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-//go:embed PDFNotas.html
+//go:embed YayNotes.html
 var appHTML []byte
 
 var lastPing atomic.Int64
@@ -97,9 +97,9 @@ func main() {
 }
 
 func startAppWindow(appURL string) *exec.Cmd {
-	profile := filepath.Join(os.Getenv("LOCALAPPDATA"), "PDFNotas", "perfil")
+	profile := filepath.Join(os.Getenv("LOCALAPPDATA"), "YayNotes", "perfil")
 	if os.Getenv("LOCALAPPDATA") == "" {
-		profile = filepath.Join(os.TempDir(), "PDFNotas-perfil")
+		profile = filepath.Join(os.TempDir(), "YayNotes-perfil")
 	}
 	os.MkdirAll(profile, 0o755)
 	for _, exe := range browserCandidates() {

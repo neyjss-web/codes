@@ -1,4 +1,4 @@
-// Teste de ponta a ponta no Chromium: abre dist/PDFNotas.html via file://
+// Teste de ponta a ponta no Chromium: abre dist/YayNotes.html via file://
 import { chromium } from 'playwright-core';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,11 +13,11 @@ const page = await ctx.newPage();
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-await page.goto(pathToFileURL(resolve('dist/PDFNotas.html')).href);
+await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href);
 await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');
-await page.waitForFunction(() => window.__pdfnotas.S.n === 40 && document.querySelector('#loading').hidden, null, { timeout: 30000 });
+await page.waitForFunction(() => window.__yaynotes.S.n === 40 && document.querySelector('#loading').hidden, null, { timeout: 30000 });
 await page.waitForTimeout(1500);
-const st = await page.evaluate(() => ({ n: window.__pdfnotas.S.annots.length, canWrite: window.__pdfnotas.S.canWrite }));
+const st = await page.evaluate(() => ({ n: window.__yaynotes.S.annots.length, canWrite: window.__yaynotes.S.canWrite }));
 console.log('anotações existentes:', st);
 await page.screenshot({ path: `${OUT}/1-grid.png` });
 
@@ -40,7 +40,7 @@ await page.fill('#group-dialog [name=label]', 'Contestação');
 await page.fill('#group-dialog [name=text]', 'Contestação do réu (fls. 15–24)');
 await page.click('#gd-ok');
 await page.waitForTimeout(500);
-console.log('grupos:', await page.evaluate(() => window.__pdfnotas.S.groups.map((g) => [g.label, g.pages.length])));
+console.log('grupos:', await page.evaluate(() => window.__yaynotes.S.groups.map((g) => [g.label, g.pages.length])));
 
 // Hover: lupa
 await page.hover('.page[data-i="16"]');
@@ -78,7 +78,7 @@ const listInfo = await page.evaluate(() => ({
 console.log('lista do arquivo:', listInfo);
 await page.locator('#ed-list .item', { hasText: 'Verificar valor da causa' }).click();
 await page.waitForTimeout(400);
-console.log('após clicar no comentário da p. 1:', await page.textContent('#ed-pageno'), 'selecionado:', await page.evaluate(() => !!window.__pdfnotas.E.selId));
+console.log('após clicar no comentário da p. 1:', await page.textContent('#ed-pageno'), 'selecionado:', await page.evaluate(() => !!window.__yaynotes.E.selId));
 
 // 3) Hiperlink interno na página 1 (índice → Contestação, fls. 15)
 await page.keyboard.press('Escape');
@@ -100,10 +100,10 @@ if (popup) await popup.close();
 await page.evaluate(() => { const s = document.querySelector('.ed-scroll'); s.scrollTop = s.scrollHeight / 2; });
 await page.waitForTimeout(600);
 console.log('rolagem para o meio → página atual:', await page.textContent('#ed-pageno'),
-  '| páginas montadas:', await page.evaluate(() => [...window.__pdfnotas.E.pages.keys()].sort((a, b) => a - b).join(',')));
+  '| páginas montadas:', await page.evaluate(() => [...window.__yaynotes.E.pages.keys()].sort((a, b) => a - b).join(',')));
 await page.screenshot({ path: `${OUT}/6-scroll.png` });
 await page.keyboard.press('Escape'); // fecha
-const annots = await page.evaluate(() => window.__pdfnotas.S.annots.map((a) => [a.type, a.page, a.contents]));
+const annots = await page.evaluate(() => window.__yaynotes.S.annots.map((a) => [a.type, a.page, a.contents]));
 console.log('total anotações:', annots.length, annots.filter((a) => !String(a[2]).startsWith('Contesta')));
 
 // Link na grade (páginas grandes)
@@ -112,7 +112,7 @@ await page.evaluate(() => document.querySelector('#viewer').scrollTo(0, 0));
 await page.waitForTimeout(1200);
 await page.locator('.page[data-i="0"] .links .lnk').nth(1).click();
 await page.waitForTimeout(800);
-console.log('grade: link da p. 1 → seleção intacta?', await page.evaluate(() => window.__pdfnotas.S.sel.size), '| topo da grade na página', await page.evaluate(() => { const v = document.querySelector('#viewer'); return [...document.querySelectorAll('.page')].find((p) => p.offsetTop + p.offsetHeight > v.scrollTop + 10)?.dataset.i; }));
+console.log('grade: link da p. 1 → seleção intacta?', await page.evaluate(() => window.__yaynotes.S.sel.size), '| topo da grade na página', await page.evaluate(() => { const v = document.querySelector('#viewer'); return [...document.querySelectorAll('.page')].find((p) => p.offsetTop + p.offsetHeight > v.scrollTop + 10)?.dataset.i; }));
 
 // Exporta FDF
 const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#export-fdf')]);
@@ -127,14 +127,14 @@ await dl2.saveAs(pdfPath);
 
 // Reabre o PDF salvo e importa o FDF (mescla)
 await page.setInputFiles('#open-pdf', pdfPath);
-await page.waitForFunction(() => window.__pdfnotas.S.fileName === 'salvo.pdf' && document.querySelector('#progress').hidden && document.querySelector('#loading').hidden, null, { timeout: 30000 }).catch(async (e) => { console.log(await page.evaluate(() => [window.__pdfnotas.S.fileName, document.querySelector("#progress").hidden, document.querySelector("#progress span").textContent])); console.log(errors); throw e; });
-console.log('reaberto: anotações lidas do PDF salvo =', await page.evaluate(() => window.__pdfnotas.S.annots.length), 'grupos =', await page.evaluate(() => window.__pdfnotas.S.groups.map((g) => [g.label, g.pages.length])));
+await page.waitForFunction(() => window.__yaynotes.S.fileName === 'salvo.pdf' && document.querySelector('#progress').hidden && document.querySelector('#loading').hidden, null, { timeout: 30000 }).catch(async (e) => { console.log(await page.evaluate(() => [window.__yaynotes.S.fileName, document.querySelector("#progress").hidden, document.querySelector("#progress span").textContent])); console.log(errors); throw e; });
+console.log('reaberto: anotações lidas do PDF salvo =', await page.evaluate(() => window.__yaynotes.S.annots.length), 'grupos =', await page.evaluate(() => window.__yaynotes.S.groups.map((g) => [g.label, g.pages.length])));
 page.once('dialog', (d) => d.accept());
 await page.setInputFiles('#import-fdf', fdfPath);
 await page.waitForSelector('#choice-dialog[open]');
 await page.click('#choice-actions button[value=replace]');
 await page.waitForTimeout(500);
-console.log('após importar FDF (substituir):', await page.evaluate(() => window.__pdfnotas.S.annots.length));
+console.log('após importar FDF (substituir):', await page.evaluate(() => window.__yaynotes.S.annots.length));
 await page.screenshot({ path: `${OUT}/5-reimport.png` });
 console.log('erros/avisos do console:', errors.slice(0, 15));
 await browser.close();

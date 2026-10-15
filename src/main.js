@@ -84,10 +84,11 @@ const grid = $('#grid');
 
 const settings = (() => {
   let data = {};
-  try { data = JSON.parse(localStorage.getItem('pdfnotas-settings') || '{}'); } catch { data = {}; }
+  // (lê também as preferências da versão anterior, quando o app se chamava "PDF Notas")
+  try { data = JSON.parse(localStorage.getItem('yaynotes-settings') || localStorage.getItem('pdfnotas-settings') || '{}'); } catch { data = {}; }
   return {
     get: (k, d) => (k in data ? data[k] : d),
-    set: (k, v) => { data[k] = v; try { localStorage.setItem('pdfnotas-settings', JSON.stringify(data)); } catch { /* sem armazenamento */ } },
+    set: (k, v) => { data[k] = v; try { localStorage.setItem('yaynotes-settings', JSON.stringify(data)); } catch { /* sem armazenamento */ } },
   };
 })();
 
@@ -183,7 +184,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 function setDirty(v = true) {
   S.dirty = v;
-  document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'PDF Notas';
+  document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'YayNotes';
   // Destaca o botão de salvar da leitura contínua quando há alterações não salvas
   $('#ed-save')?.classList.toggle('primary', v);
 }
@@ -2381,7 +2382,7 @@ document.addEventListener('keydown', (e) => {
 applyZoomVar();
 setDirty(false);
 
-// Quando aberto pelo PDFNotas.exe (servidor local): sinal de vida e PDF recebido na linha de comando
+// Quando aberto pelo YayNotes.exe (servidor local): sinal de vida e PDF recebido na linha de comando
 (async function launcherIntegration() {
   const token = new URLSearchParams(location.search).get('t');
   if (!/^https?:$/.test(location.protocol) || !token) return;
@@ -2400,4 +2401,4 @@ setDirty(false);
 })();
 
 // Exposto para testes automatizados
-window.__pdfnotas = { pdfjsLib, DOC_OPTIONS, S, E, openPdf, importFdfFile, exportFdfFile, savePdf, applyGroup, setZoom };
+window.__yaynotes = { pdfjsLib, DOC_OPTIONS, S, E, openPdf, importFdfFile, exportFdfFile, savePdf, applyGroup, setZoom };

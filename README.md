@@ -1,84 +1,85 @@
-# PDF Notas
+<p align="center">
+  <img src="assets/yaynotes-256.png" width="128" height="128" alt="Ícone do YayNotes">
+</p>
 
-Leitor de PDF focado em **comentários e observações**, com **importação e exportação em FDF**.
-Roda no Windows **sem instalação**.
+<h1 align="center">YayNotes</h1>
 
-## Como usar no Windows
+<p align="center"><b>Leitor de processos baixados do PJe em PDF, feito para fazer e reaproveitar comentários.</b><br>
+Gratuito, funciona offline e não precisa de instalação.</p>
 
-1. Baixe `dist/PDFNotas.exe`. É um arquivo único (~9 MB) e portátil, que pode ficar numa pasta, na área de trabalho ou num pendrive.
-   Ele é de 32 bits e roda em Windows 7, 8, 10 e 11, de 32 ou 64 bits.
-2. Dê um clique duplo. O app abre numa janela própria do Microsoft Edge, que já vem no Windows 10 e 11. No Windows 7/8, é preciso ter o Edge ou o Chrome instalado.
-   - Se preferir, **arraste um PDF sobre o `PDFNotas.exe`** ou use *Abrir com → PDFNotas.exe*. O PDF abre direto.
-   - Na primeira execução, o Windows SmartScreen pode avisar que o programa não é assinado. Clique em *Mais informações → Executar assim mesmo*.
-3. Outra opção é abrir `dist/PDFNotas.html` com clique duplo no Edge ou no Chrome. É o mesmo app em um único arquivo HTML e funciona offline.
+---
 
-Nenhuma das duas formas precisa de internet nem de instalação. O PDF é processado só no seu computador.
+## Para que serve
 
-## Funcionalidades
+O YayNotes foi criado para **abrir os arquivos PDF de processos baixados do PJe** (Processo Judicial Eletrônico)
+e **trabalhar com comentários** neles.
 
-| Recurso | Como |
+Quem acompanha um processo baixa o PDF dele várias vezes e precisa **marcar, comentar e reencontrar** trechos em
+centenas de páginas. Para isso, o YayNotes:
+
+- mostra **todas as páginas** do processo lado a lado, como miniaturas;
+- deixa **marcar dezenas de páginas de uma vez** com um único comentário, como "Contestação" ou "Documentos";
+- grava os comentários em **FDF**, o formato de comentários do Adobe, e no próprio PDF;
+- ao carregar os comentários num **PDF mais novo do mesmo processo**, coloca cada comentário na página certa,
+  mesmo que a numeração tenha mudado. Para isso usa o "Num. … - Pág. …" do rodapé do PJe.
+
+## Como usar (Windows)
+
+1. Baixe o arquivo **[`YayNotes.exe`](dist/YayNotes.exe)**. É um arquivo único, sem instalação, que roda no Windows 7, 8, 10 e 11.
+2. Dê dois cliques nele. O app abre numa janela própria, usando o Microsoft Edge que já vem no Windows.
+   Também dá para **arrastar um PDF sobre o `YayNotes.exe`** para abri-lo direto.
+3. Na primeira vez, o Windows pode mostrar o aviso *"O Windows protegeu o computador"*. Clique em
+   **Mais informações → Executar assim mesmo**. O aviso aparece porque o programa não tem assinatura digital paga.
+
+> Alternativa: o arquivo **[`YayNotes.html`](dist/YayNotes.html)** é o mesmo app num único arquivo de página.
+> Basta abri-lo no Edge ou no Chrome. Funciona também fora do Windows.
+
+**Seus arquivos não saem do seu computador.** O app não envia nada para a internet.
+
+## O que dá para fazer
+
+| | |
 |---|---|
-| Várias páginas contínuas na tela | As páginas se distribuem em grade, quantas couberem na largura, com rolagem contínua |
-| Ao abrir | A grade começa com 4 páginas por linha |
-| Tamanho das miniaturas | Botões **− Menores** / **+ Maiores** e o controle deslizante na barra superior, ou as teclas <kbd>&lt;</kbd> (cabem mais páginas) e <kbd>&gt;</kbd> (cabem menos) |
-| Página inteira | Na leitura contínua, a navegação entre páginas (setas, PageUp/PageDown, ▲ ▼, comentários, marcadores, links e busca) sempre mostra a página inteira na tela, mesmo depois de usar − / +, e ajusta o zoom a páginas de outro tamanho, como as em paisagem. A rolagem com o mouse continua livre. O botão **Página inteira** (ou a tecla <kbd>0</kbd>) refaz o ajuste a qualquer momento |
-| Lupa | Ao passar o cursor sobre uma página, ela aparece ampliada ao lado, com os comentários destacados e numerados, e a lista de textos. <kbd>L</kbd> liga e desliga |
-| Selecionar dezenas de páginas | Clique em cada página, use <kbd>Shift</kbd>+clique para um intervalo ou digite `1-30, 45, 50-` na barra de seleção. <kbd>Ctrl</kbd>+<kbd>A</kbd> seleciona todas |
-| Comentário único em várias páginas | **Marcar seleção com comentário…** (ou <kbd>M</kbd>). Informe um rótulo (Contestação, Documentos…), o texto e a cor. Cada página recebe uma nota e, se quiser, uma moldura colorida. A marcação pode ser editada ou excluída em bloco no painel lateral |
-| Ler o texto e comentar | Clique duplo numa página abre a **leitura contínua**: todas as páginas em sequência, com rolagem. Dá para selecionar e copiar o texto e usar as ferramentas Nota, Texto livre, Realçar/Sublinhar/Tachar (sobre o texto selecionado), Retângulo, Elipse e Desenho |
-| Editar comentário | Na leitura contínua, um **clique duplo no ícone** (ou na marcação) de um comentário abre direto a edição do texto. O texto aceita apenas **negrito** (<kbd>Ctrl</kbd>+<kbd>B</kbd> ou botão **B**) e **vermelho** (botão **A** ou <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>). **Limpar** remove os dois. Outras formatações são ignoradas, texto colado entra sem formatação, e a fonte é sempre a mesma. A formatação é gravada no campo padrão de texto rico do PDF/FDF (`/RC`), que o Adobe também exibe |
-| Pop-up do comentário | Na leitura contínua, ao pairar o cursor sobre um comentário (nota, realce, retângulo etc.), aparece um pop-up com o texto, o autor, a data e a página |
-| Todos os comentários do arquivo | Na leitura contínua, o painel à direita lista as marcações e todos os comentários do arquivo, agrupados por página e com filtro. Clicar num comentário salta até ele e o seleciona |
-| Copiar Num. | Na leitura contínua, o botão **Copiar Num.** mostra e copia o número do documento e a página impressos no rodapé da página atual (padrão PJe: copia “2177293507 - Pág. 1”). **Copiar texto** copia o texto da página |
-| Marcadores | O painel lateral tem as abas **Comentários** e **Marcadores**. Marcadores mostra o sumário do PDF (os mesmos do Acrobat), com subníveis, página de cada item e filtro. Clicar salta para o destino. Na leitura contínua, o marcador da página atual fica destacado. A aba escolhida é lembrada |
-| Hiperlinks | Links do PDF funcionam ao clicar: os internos (índices, sumários) saltam para a página de destino e os externos abrem no navegador. Na grade, ficam ativos quando as páginas estão grandes (≥ 300 px) |
-| Busca | <kbd>Ctrl</kbd>+<kbd>F</kbd> marca as páginas que contêm o termo e mostra “3 de 12 · p. 875”. Os botões ▲ ▼, <kbd>Enter</kbd>/<kbd>Shift</kbd>+<kbd>Enter</kbd> no campo ou <kbd>F3</kbd>/<kbd>Shift</kbd>+<kbd>F3</kbd> passam para a próxima/anterior ocorrência, na grade e na leitura contínua, onde o trecho fica destacado. **Páginas da busca** seleciona todas elas para marcar |
-| FDF | Botões na tela de miniaturas e na visão de página. **Salvar FDF** grava todos os comentários. **Carregar FDF** mescla com os comentários atuais ou substitui todos. É compatível com Adobe Acrobat/Reader, Foxit e similares |
-| Salvar PDF | Botão **Salvar PDF** na barra superior e também na leitura contínua (fica azul quando há alterações não salvas), ou <kbd>Ctrl</kbd>+<kbd>S</kbd>. Gera uma cópia `…-comentado.pdf` com os comentários como anotações padrão do PDF, visíveis em qualquer leitor |
-| Desfazer | <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> |
+| **Ver o processo inteiro** | Páginas em miniatura, 4 por linha ao abrir. Os botões **− Menores / + Maiores** (ou as teclas `<` e `>`) mudam o tamanho. |
+| **Lupa** | Passe o mouse sobre uma página para vê-la ampliada, com os comentários destacados. |
+| **Marcar várias páginas** | Clique nas páginas (ou digite `15-24, 30`) e use **Marcar seleção com comentário…**. |
+| **Ler e comentar** | Clique duplo numa página abre a leitura, sempre com a **página inteira** na tela. As setas `←` `→` mudam de página. |
+| **Ferramentas** | Nota, texto, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
+| **Texto do comentário** | Só **negrito** (`Ctrl+B`) e **vermelho**, sempre na mesma fonte. Clique duplo num comentário abre a edição. |
+| **Encontrar** | Busca no texto com **próxima/anterior ocorrência**, abas de **Comentários** e **Marcadores** do PDF, e links que funcionam. |
+| **PJe** | Botão **Copiar Num.** copia "2177293507 - Pág. 1" da página atual. |
+| **Salvar** | **Salvar PDF** grava uma cópia com os comentários. **Salvar/Carregar FDF** guarda e recupera só os comentários. |
 
-### Comentários vinculados ao “Num.” do PJe (novos downloads do processo)
+O FDF salvo pelo YayNotes também abre no **Adobe Acrobat/Reader** (*Comentários → Importar*). Só o reajuste de páginas
+pelo "Num." é exclusivo do YayNotes.
 
-Cada comentário guarda o **“Num. … - Pág. …”** impresso no rodapé da página em que foi feito. O vínculo fica gravado
-no identificador do comentário (`/NM`, por exemplo `a1b2c3;num=2177293507;pag=1`), tanto no FDF quanto no PDF salvo.
-Ao **carregar o FDF em um PDF baixado depois**, em que documentos novos deslocaram as páginas, o app procura a página com o
-mesmo Num./Pág. e move o comentário para ela, inclusive as marcações de grupo. Comentários cujo Num. não existe no
-PDF atual ficam no número de página original, e o app avisa quantos foram reposicionados e quantos não foram
-encontrados. Páginas sem esse rodapé (por exemplo, digitalizadas sem texto) não recebem vínculo.
+Para a lista completa do que o app faz, com as decisões e os limites, veja **[ESPECIFICACOES.md](ESPECIFICACOES.md)**.
 
-**Revisão ao abrir:** sempre que comentários são abertos, tanto os que vêm dentro do PDF quanto os de um FDF, o app vincula ao
-Num./Pág. todos os que ainda não têm vínculo e descarta qualquer formatação de texto que não seja negrito ou vermelho
-(itálico, sublinhado, outras fontes, tamanhos ou cores). Um aviso mostra o que foi revisado, e a revisão é gravada no
-próximo **Salvar PDF** ou **Salvar FDF**.
+## Para quem quer mexer no código
 
-O FDF continua sendo um FDF padrão: o **Adobe Acrobat/Reader** o carrega normalmente (*Comentários → Importar*), mas coloca
-cada comentário no mesmo número de página de antes, porque não faz o reajuste pelo Num.
-
-Os comentários que já existem no PDF (notas, realces, formas, desenhos, texto livre) são carregados e ficam editáveis.
-As marcações de grupo são gravadas com identificador `grp-<id>-p<página>` (campo `/NM`). Por isso, ao reimportar um FDF
-ou reabrir o PDF salvo, elas voltam agrupadas.
-
-## Desenvolvimento
-
-Requer Node.js 20+ (e Go 1.21+ apenas para gerar o `.exe`).
+Requer [Node.js](https://nodejs.org) 20+. O Go 1.20+ só é necessário para gerar o `.exe`.
 
 ```bash
 npm install
-npm test            # testes de FDF, gravação/leitura no PDF e intervalos de páginas
-npm run build       # gera dist/PDFNotas.html (arquivo único)
-npm run build:win   # gera também dist/PDFNotas.exe (Windows 32 bits, portátil; usa Go 1.20 via GOTOOLCHAIN)
-npm run dev         # build + servidor em http://localhost:8080
-npm run test:e2e    # testes de ponta a ponta no Chromium (CHROME_PATH=/caminho/do/chrome)
-npm run sample      # gera samples/exemplo.pdf e samples/exemplo-v2.pdf (versão com páginas inseridas)
+npm test            # testes automáticos (FDF, gravação no PDF, vínculo ao Num., texto formatado)
+npm run build       # gera dist/YayNotes.html
+npm run build:win   # gera também dist/YayNotes.exe
+npm run dev         # abre em http://localhost:8080
+npm run test:e2e    # testes no navegador (Chromium)
+npm run sample      # gera os PDFs de exemplo em samples/
 ```
 
-Estrutura:
+| Pasta / arquivo | O que tem |
+|---|---|
+| `src/main.js` | Telas: miniaturas, lupa, leitura, busca, marcadores |
+| `src/fdf.js`, `src/pdfsyntax.js` | Leitura e escrita de FDF |
+| `src/pdfannots.js`, `src/annotdict.js` | Leitura e gravação de comentários dentro do PDF |
+| `src/richtext.js` | Texto com negrito e vermelho |
+| `src/model.js` | Dados dos comentários e vínculo ao "Num." |
+| `launcher/` | O `YayNotes.exe` (em Go), que abre o app numa janela do Edge |
+| `assets/` | Ícone |
 
-- `src/main.js`: interface (grade, lupa, seleção, marcações em grupo, editor de página, busca)
-- `src/fdf.js` e `src/pdfsyntax.js`: leitura e escrita de FDF
-- `src/pdfannots.js`: leitura, remoção e gravação de anotações no PDF (pdf-lib), incluindo as aparências (`/AP`)
-- `src/model.js` e `src/annotdict.js`: modelo de dados das anotações
-- `launcher/`: executável Windows em Go que embute o HTML e o abre numa janela do Edge
-- `build.mjs`: empacota tudo num único HTML, com o pdf.js, as fontes padrão e os decodificadores JBIG2/JPEG2000 embutidos
+## Licença
 
-Bibliotecas: [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) e [pdf-lib](https://pdf-lib.js.org/) (MIT).
+Código aberto sob a [licença MIT](LICENSE). Usa [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0) e
+[pdf-lib](https://pdf-lib.js.org/) (MIT).

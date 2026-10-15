@@ -1,3 +1,3 @@
-module pdfnotas
+module yaynotes
 
 go 1.20

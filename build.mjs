@@ -1,6 +1,6 @@
-// Gera dist/PDFNotas.html: um único arquivo HTML autocontido (funciona offline, abrindo direto no navegador).
+// Gera dist/YayNotes.html: um único arquivo HTML autocontido (funciona offline, abrindo direto no navegador).
 // Uso: node build.mjs [--win] [--serve] [--port=8080]
-//   --win  também gera dist/PDFNotas.exe (Windows, portátil, sem instalação)
+//   --win  também gera dist/YayNotes.exe (Windows, portátil, sem instalação)
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const pdfjsDir = join(root, 'node_modules', 'pdfjs-dist');
-const outFile = join(root, 'dist', 'PDFNotas.html');
+const outFile = join(root, 'dist', 'YayNotes.html');
 
 async function run() {
   const js = await build({
@@ -41,6 +41,9 @@ async function run() {
   }
 
   let html = readFileSync(join(root, 'src', 'index.html'), 'utf8');
+  // Ícone (favicon e logotipo) embutido como data URI
+  const icon = 'data:image/svg+xml;base64,' + readFileSync(join(root, 'assets', 'yaynotes.svg')).toString('base64');
+  html = html.replaceAll('__ICON__', icon);
   html = html.replace('/*__CSS__*/', () => css);
   html = html.replace('<script type="module">/*__JS__*/</script>', () =>
     `<script type="application/json" id="pdfjs-assets">${JSON.stringify(assets)}</script>\n<script type="module">${code}</script>`);
@@ -51,13 +54,13 @@ async function run() {
   if (process.argv.includes('--win')) buildWindowsExe();
 }
 
-// Gera dist/PDFNotas.exe (Windows 32 bits, portátil) com o HTML embutido.
+// Gera dist/YayNotes.exe (Windows 32 bits, portátil) com o HTML embutido.
 // 32 bits roda em qualquer Windows (32 e 64 bits, e ARM por emulação). O Go 1.20 é a última
 // versão que mantém compatibilidade com Windows 7/8; é obtido automaticamente via GOTOOLCHAIN.
 function buildWindowsExe() {
   const launcher = join(root, 'launcher');
-  copyFileSync(outFile, join(launcher, 'PDFNotas.html'));
-  const exe = join(root, 'dist', 'PDFNotas.exe');
+  copyFileSync(outFile, join(launcher, 'YayNotes.html'));
+  const exe = join(root, 'dist', 'YayNotes.exe');
   execFileSync('go', ['build', '-trimpath', '-ldflags', '-s -w -H windowsgui', '-o', exe, '.'], {
     cwd: launcher,
     stdio: 'inherit',
@@ -71,7 +74,7 @@ await run();
 if (process.argv.includes('--serve')) {
   const port = +(process.argv.find((a) => a.startsWith('--port='))?.split('=')[1] || 8080);
   createServer((req, res) => {
-    if (req.url === '/' || req.url.startsWith('/?') || req.url.startsWith('/PDFNotas.html')) {
+    if (req.url === '/' || req.url.startsWith('/?') || req.url.startsWith('/YayNotes.html')) {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(readFileSync(outFile));
     } else if (req.url.startsWith('/samples/')) {
