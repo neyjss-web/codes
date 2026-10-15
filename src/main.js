@@ -316,7 +316,7 @@ async function rotateView(delta) {
   buildGrid();
   const el = pageEl(anchorPage);
   if (el) viewer.scrollTop = el.offsetTop - 14;
-  if (E.open) { E.fit = true; buildEditorPages(anchorPage, 0); }
+  if (E.open) { E.fit = true; E.keepRot = null; buildEditorPages(anchorPage, 0); }
   toast(`Visualização girada: ${S.rot}°`, false, 1500);
 }
 
@@ -1087,11 +1087,51 @@ function resetEditorPages() {
   E.io?.disconnect();
   for (const st of E.pages.values()) st.task?.cancel();
   E.pages.clear();
+  E.want = new Set();
+  E.active = 0;
+  E.prio = null;
+  E.navTok = (E.navTok || 0) + 1;
+  E.pendingNav = null;
   epages.innerHTML = '';
+}
+
+// Fila de desenho: a página atual primeiro, depois as vizinhas (no máximo 2 ao mesmo tempo)
+function wantEPage(i) {
+  if (!E.want) E.want = new Set();
+  if (i >= 0 && i < S.n && !E.pages.has(i)) E.want.add(i);
+  pumpEPages();
+}
+function pumpEPages() {
+  if (!E.want) return;
+  while ((E.active || 0) < 2) {
+    let best = -1, bd = Infinity;
+    for (const i of E.want) {
+      if (E.pages.has(i)) { E.want.delete(i); continue; }
+      const d = Math.abs(i - (E.prio ?? E.i));
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (best < 0) return;
+    E.want.delete(best);
+    E.active = (E.active || 0) + 1;
+    const gen = E.gen;
+    renderEPage(best).finally(() => { if (gen === E.gen) E.active--; pumpEPages(); });
+  }
 }
 
 // Cria os espaços de todas as páginas; o conteúdo é renderizado sob demanda.
 function buildEditorPages(anchor, ratio = 0) {
+  // Guarda as páginas já desenhadas perto da âncora: ficam visíveis (esticadas) até a nova versão ficar pronta,
+  // em vez de a tela piscar em branco
+  const keep = new Map();
+  if (E.keepRot === S.rot) {
+    for (const i of E.pages.keys()) {
+      if (Math.abs(i - anchor) > 3) continue;
+      const c = epageEl(i)?.querySelector('canvas.main');
+      if (c) keep.set(i, c);
+    }
+  }
+  E.keep = keep;
+  E.keepRot = S.rot;
   resetEditorPages();
   if (E.fit) {
     // Página inteira: a página cabe por completo na área visível (largura e altura)
@@ -1118,12 +1158,19 @@ function buildEditorPages(anchor, ratio = 0) {
   E.io = new IntersectionObserver((entries) => {
     for (const en of entries) {
       const i = +en.target.dataset.i;
-      if (en.isIntersecting) renderEPage(i); else releaseEPage(i);
+      if (en.isIntersecting) wantEPage(i); else { E.want?.delete(i); releaseEPage(i); }
     }
   }, { root: escroll, rootMargin: '1200px 0px' });
   for (const el of epages.children) E.io.observe(el);
   const el = epageEl(anchor);
   escroll.scrollTop = el.offsetTop - 12 + ratio * el.offsetHeight;
+  // sem quadro em branco: prévias imediatas nas páginas próximas e desenho da página de destino já iniciado
+  E.i = anchor;
+  for (let k = Math.max(0, anchor - 2); k <= Math.min(S.n - 1, anchor + 2); k++) {
+    const pel = epageEl(k), ph = placeholderFor(k);
+    if (ph) pel.prepend(ph);
+  }
+  wantEPage(anchor);
   $('#ed-zoom').textContent = `${Math.round(E.scale * 100)}%`;
   setCurrentPage(anchor, true);
   updateToolUI();
@@ -1131,13 +1178,34 @@ function buildEditorPages(anchor, ratio = 0) {
   renderProps();
 }
 
+// Prévia da página i: a mesma página já desenhada antes (outro zoom) ou a miniatura da grade ampliada
+function placeholderFor(i) {
+  let ph = E.keep?.get(i) || null;
+  E.keep?.delete(i);
+  if (!ph) {
+    const t = pageEl(i)?.querySelector('canvas.pg');
+    if (t && t.width) {
+      ph = document.createElement('canvas');
+      ph.width = t.width;
+      ph.height = t.height;
+      ph.getContext('2d').drawImage(t, 0, 0);
+    }
+  }
+  if (ph) ph.className = 'ph';
+  return ph;
+}
+
+// Desenha a página i fora da tela e só então a mostra (sem "piscar" em branco).
+// Enquanto isso, mostra uma prévia: a mesma página desenhada antes (zoom anterior) ou a miniatura ampliada.
 async function renderEPage(i) {
   if (E.pages.has(i)) return;
   const gen = E.gen;
-  const st = { vp: evp(i) };
+  const st = { vp: evp(i), ready: false };
+  st.readyP = new Promise((r) => { st.markReady = () => { st.ready = true; r(); }; });
   E.pages.set(i, st);
   const el = epageEl(i);
   const canvas = document.createElement('canvas');
+  canvas.className = 'main';
   // exatamente os pixels da tela ocupados pela página (sem reamostragem = sem embaçar)
   canvas.width = +el.dataset.wd || Math.round(st.vp.width * DPRE());
   canvas.height = +el.dataset.hd || Math.round(st.vp.height * DPRE());
@@ -1146,8 +1214,10 @@ async function renderEPage(i) {
   tl.style.setProperty('--total-scale-factor', E.scale);
   const draw = document.createElement('div');
   draw.className = 'draw';
+  let ph = el.querySelector('canvas.ph') || placeholderFor(i);
   el.innerHTML = `<span class="epno">${i + 1}</span>`;
-  el.prepend(canvas, tl);
+  if (ph) el.prepend(ph);
+  el.insertBefore(tl, ph ? ph.nextSibling : el.firstChild); // ordem: imagem, texto, número
   el.append(draw);
   renderEPageOverlay(i);
   try {
@@ -1156,6 +1226,20 @@ async function renderEPage(i) {
     st.task = page.render({ canvas, viewport: page.getViewport({ scale: canvas.width / S.vps[i].width, rotation: rotOf(page) }) });
     await st.task.promise;
     if (gen !== E.gen || E.pages.get(i) !== st) return;
+    // troca a prévia pela página pronta, de uma vez
+    if (ph && ph.parentNode === el) ph.replaceWith(canvas); else el.insertBefore(canvas, tl);
+    st.markReady();
+    finishEPage(i, st, page, tl, gen); // links e texto selecionável, sem segurar a fila de desenho
+  } catch (e) {
+    if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao exibir página', i + 1, e);
+  } finally {
+    if (!st.ready) st.markReady(); // nunca deixa a navegação esperando por uma página com erro
+  }
+}
+
+async function finishEPage(i, st, page, tl, gen) {
+  const el = epageEl(i);
+  try {
     const links = await getLinks(i);
     if (gen !== E.gen || E.pages.get(i) !== st) return;
     if (links.length) el.insertBefore(buildLinkLayer(i, links), $('svg.ann', el));
@@ -1164,7 +1248,7 @@ async function renderEPage(i) {
     markHits(tl);
     st.textReady = true;
   } catch (e) {
-    if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao exibir página', i + 1, e);
+    if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao exibir o texto da página', i + 1, e);
   }
 }
 
@@ -1215,6 +1299,7 @@ escroll.addEventListener('scroll', () => {
 function setCurrentPage(i, force = false) {
   if (!force && i === E.i) return;
   E.i = i;
+  pumpEPages();
   updateOutlineCurrent(i);
   updateNumButton(i);
   $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
@@ -1253,14 +1338,34 @@ new ResizeObserver(() => {
 
 // Navegação entre páginas: sempre mostra a página inteira (volta ao ajuste de página inteira
 // se o zoom tiver sido alterado ou se a página tiver outro tamanho/orientação)
-function gotoEditorPage(i, smooth = false) {
+// Página de referência para "anterior/próxima" (considera uma troca ainda em andamento)
+const navBase = () => E.pendingNav ?? E.i;
+
+async function gotoEditorPage(i, smooth = false) {
   if (i < 0 || i >= S.n) return;
   if (!E.fit || Math.abs(fitScaleFor(i) - E.scale) > 0.005) {
     E.fit = true;
+    E.pendingNav = null;
     buildEditorPages(i, 0);
     return;
   }
+  // Sem "piscar": se a página de destino ainda não estiver desenhada, a página atual continua
+  // na tela até a nova ficar pronta (no máximo 1,5 s) e só então a troca acontece
+  if (!E.pages.get(i)?.ready) {
+    const tok = (E.navTok = (E.navTok || 0) + 1);
+    E.pendingNav = i;
+    E.prio = i;
+    wantEPage(i);
+    const t0 = performance.now();
+    while (!E.pages.get(i)?.ready && performance.now() - t0 < 1500) {
+      await new Promise((r) => setTimeout(r, 20));
+      if (tok !== E.navTok || !E.open) return;
+    }
+    E.prio = null;
+  }
+  E.pendingNav = null;
   const el = epageEl(i);
+  if (!el) return;
   escroll.scrollTo({ top: el.offsetTop - 12, behavior: smooth ? 'smooth' : 'auto' });
   setCurrentPage(i, true);
 }
@@ -1433,8 +1538,8 @@ $('#ed-close').onclick = closeEditor;
 $('#ed-save').onclick = () => savePdf(false);
 $('#ed-fdf').onclick = () => exportFdfFile();
 $('#ed-import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFdfFile(f); };
-$('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
-$('#ed-next').onclick = () => gotoEditorPage(E.i + 1);
+$('#ed-prev').onclick = () => gotoEditorPage(navBase() - 1);
+$('#ed-next').onclick = () => gotoEditorPage(navBase() + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
 $('#ed-fit').onclick = fitWholePage;
@@ -2582,9 +2687,9 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (E.open) {
-    if (e.key === 'PageDown' || (e.key === 'ArrowRight' && !mod)) { e.preventDefault(); gotoEditorPage(E.i + 1); return; }
+    if (e.key === 'PageDown' || (e.key === 'ArrowRight' && !mod)) { e.preventDefault(); gotoEditorPage(navBase() + 1); return; }
     if (e.key === '0' && !mod) { e.preventDefault(); fitWholePage(); return; }
-    if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && !mod)) { e.preventDefault(); gotoEditorPage(E.i - 1); return; }
+    if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && !mod)) { e.preventDefault(); gotoEditorPage(navBase() - 1); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && E.selId) { e.preventDefault(); deleteAnnot(E.selId); return; }
     if (!mod && TOOL_KEYS[e.key.toLowerCase()]) { setTool(TOOL_KEYS[e.key.toLowerCase()]); return; }
     return;
