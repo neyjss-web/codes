@@ -81,7 +81,8 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 |---|---|
 | Exportar e importar comentários em FDF | **Salvar FDF / Carregar FDF**, na tela inicial e na visão de página. Ao carregar, dá para **mesclar** com os comentários atuais ou **substituir todos**. |
 | O FDF continua abrindo no Adobe Reader? | **Sim.** É um FDF padrão. O Adobe só não faz o reajuste pelo "Num.": coloca cada comentário no mesmo número de página. A formatação (negrito/vermelho) vai no campo padrão de texto formatado (`/RC`). |
-| Salvar o PDF com os comentários | **Salvar PDF** gera `…-comentado.pdf`, com os comentários visíveis em qualquer leitor, e mostra a caixa "Salvando arquivo PDF…". |
+| Salvar o PDF com os comentários **dentro do mesmo arquivo** | **Salvar PDF** grava no próprio arquivo aberto, inclusive quando o PDF é arrastado sobre o `YayNotes.exe`. **Salvar como…** grava em outro arquivo. A gravação é segura: se algo falhar no meio, o arquivo original não é alterado. |
+| Não usar o painel de downloads do navegador | O painel tinha opções perigosas, como desfazer e lixeira, e um arquivo foi perdido por acidente. Agora o PDF é gravado direto no arquivo, e o FDF pela janela "Salvar como" do Windows, que já abre na pasta do PDF. O painel não aparece mais. O Edge pede, uma vez, permissão para o app editar o arquivo. |
 | Rodar em qualquer Windows | O `.exe` é de 32 bits e funciona do Windows 7 ao 11, em 32 ou 64 bits. |
 
 ## 6. Limites conhecidos
@@ -110,4 +111,4 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | `Ctrl+B` / `Ctrl+Shift+X` | Negrito / vermelho no texto do comentário |
 | `Del` | Excluir o comentário selecionado |
 | `Ctrl+Z` / `Ctrl+Y` | Desfazer / refazer |
-| `Ctrl+S` | Salvar PDF |
+| `Ctrl+S` / `Ctrl+Shift+S` | Gravar os comentários no PDF aberto / Salvar como outro arquivo |

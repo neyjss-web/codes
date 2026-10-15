@@ -210,7 +210,7 @@ function restore(from, to) {
 // Abrir PDF
 // ============================================================================
 
-async function openPdf(file) {
+async function openPdf(file, target = null) {
   if (S.dirty) {
     const r = await choose('Há comentários não salvos. Abrir outro PDF mesmo assim?', [
       { label: 'Cancelar', value: 'no' }, { label: 'Abrir e descartar', value: 'yes', primary: true },
@@ -254,7 +254,7 @@ async function openPdf(file) {
     pv.cache.clear();
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
-      fileName: file.name, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
+      fileName: file.name, target, fdfHandle: null, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
       sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], searchTerm: '',
       undo: [], redo: [],
     });
@@ -273,8 +273,8 @@ async function openPdf(file) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#export-fdf', '#search']) $(b).disabled = false;
-    $('#save-pdf').title = canWrite ? 'Salvar uma cópia do PDF com os comentários (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#search']) $(b).disabled = false;
+    $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
     const nA = S.annots.length;
@@ -1384,7 +1384,7 @@ function updateToolUI() {
 $$('#editor .tool').forEach((b) => { b.onclick = () => setTool(b.dataset.tool); });
 $('#tool-color').oninput = (e) => { if (E.tool !== 'select') settings.set('color-' + E.tool, e.target.value); };
 $('#ed-close').onclick = closeEditor;
-$('#ed-save').onclick = () => savePdf();
+$('#ed-save').onclick = () => savePdf(false);
 $('#ed-fdf').onclick = () => exportFdfFile();
 $('#ed-import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFdfFile(f); };
 $('#ed-prev').onclick = () => gotoEditorPage(E.i - 1);
@@ -2201,15 +2201,80 @@ async function relocateByAnchor(list) {
   return { moved, notFound, total: withAnchor.length };
 }
 
+// ---- Gravação de arquivos sem passar pelos downloads do navegador ----
+// Com a File System Access API (Edge/Chrome), o PDF é gravado no próprio arquivo aberto e o FDF pela
+// janela "Salvar como" do Windows. Assim não aparece o painel de downloads do navegador (que tem
+// opções como excluir o arquivo). Sem a API (ou com ?download=1, usado nos testes), usa download comum.
+const FS_API = typeof window.showSaveFilePicker === 'function' && !new URLSearchParams(location.search).has('download');
+const PDF_TYPES = [{ description: 'Documento PDF', accept: { 'application/pdf': ['.pdf'] } }];
+const FDF_TYPES = [{ description: 'Comentários (FDF)', accept: { 'application/vnd.fdf': ['.fdf'] } }];
+const isAbort = (e) => e?.name === 'AbortError';
+
+async function canWriteHandle(h) {
+  try {
+    const o = { mode: 'readwrite' };
+    if ((await h.queryPermission?.(o)) === 'granted') return true;
+    return (await h.requestPermission?.(o)) === 'granted';
+  } catch { return false; }
+}
+
+async function pickSaveHandle(suggestedName, types, startIn) {
+  const opts = { suggestedName, types, excludeAcceptAllOption: false };
+  if (startIn) opts.startIn = startIn;
+  try { return await window.showSaveFilePicker(opts); } catch (e) {
+    if (isAbort(e)) return null;
+    // startIn pode não ser aceito em algumas versões
+    if (startIn) return window.showSaveFilePicker({ suggestedName, types }).catch((e2) => { if (isAbort(e2)) return null; throw e2; });
+    throw e;
+  }
+}
+
+async function writeTarget(target, bytes, mime) {
+  if (target.kind === 'handle') {
+    const w = await target.handle.createWritable();
+    await w.write(new Blob([bytes], { type: mime }));
+    await w.close();
+  } else if (target.kind === 'launcher') {
+    const token = new URLSearchParams(location.search).get('t');
+    const r = await fetch('/save-initial?t=' + encodeURIComponent(token), { method: 'POST', body: bytes });
+    if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
+  } else {
+    download(bytes, target.name, mime);
+  }
+}
+
+// Para onde o PDF será gravado: o próprio arquivo aberto ou, em "Salvar como", um arquivo escolhido.
+// Deve ser chamado logo no clique (o navegador exige a ação do usuário para pedir permissão).
+async function choosePdfTarget(saveAs) {
+  if (!saveAs && S.target?.kind === 'launcher') return S.target;
+  if (!saveAs && S.target?.kind === 'handle' && (await canWriteHandle(S.target.handle))) return S.target;
+  if (FS_API) {
+    const h = await pickSaveHandle(saveAs ? `${baseName()}-comentado.pdf` : S.fileName, PDF_TYPES, S.target?.handle);
+    return h ? { kind: 'handle', handle: h } : null;
+  }
+  return { kind: 'download', name: `${baseName()}-comentado.pdf` };
+}
+
+async function openPdfDialog() {
+  if (!FS_API || typeof window.showOpenFilePicker !== 'function') { $('#open-pdf').click(); return; }
+  try {
+    const [h] = await window.showOpenFilePicker({ types: PDF_TYPES, multiple: false });
+    if (h) openPdf(await h.getFile(), { kind: 'handle', handle: h });
+  } catch (e) { if (!isAbort(e)) toast('Não foi possível abrir o arquivo: ' + e.message, true); }
+}
+
 const baseName = () => S.fileName.replace(/\.pdf$/i, '') || 'documento';
 
-async function savePdf() {
+async function savePdf(saveAs = false) {
   if (!S.pdf) return;
   if (!S.canWrite) {
     toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Salvar FDF”.', true);
     return;
   }
-  const name = `${baseName()}-comentado.pdf`;
+  let target;
+  try { target = await choosePdfTarget(saveAs); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return; }
+  if (!target) return; // cancelado
+  const name = target.kind === 'handle' ? target.handle.name : target.kind === 'launcher' ? S.fileName : target.name;
   loadingBox({ name }, 'Salvando arquivo PDF…');
   try {
     progress(0.1, 'Lendo o documento original…');
@@ -2223,14 +2288,21 @@ async function savePdf() {
     progress(0.65, 'Gerando o arquivo PDF…');
     await nextPaint();
     const out = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
-    progress(1, `Concluído (${fmtSize(out.length)})`);
+    progress(0.85, `Gravando o arquivo (${fmtSize(out.length)})…`);
     await nextPaint();
-    download(out, name, 'application/pdf');
+    await writeTarget(target, out, 'application/pdf');
+    progress(1, 'Concluído');
+    await nextPaint();
+    // o arquivo gravado passa a ser o arquivo de trabalho
+    S.bytes = out;
+    if (target.kind !== 'download') { S.target = target; S.fileName = name; }
     setDirty(false);
-    toast(`PDF salvo com ${S.annots.length} comentário(s): ${name}`);
+    toast(target.kind === 'download'
+      ? `PDF salvo com ${S.annots.length} comentário(s): ${name} (pasta Downloads)`
+      : `${S.annots.length} comentário(s) gravado(s) dentro de ${name}.`);
   } catch (e) {
     console.error(e);
-    toast('Erro ao salvar o PDF: ' + e.message, true);
+    toast('Erro ao salvar o PDF: ' + e.message + '. O arquivo original não foi alterado.', true);
   } finally {
     progress(null);
     loadingBox(null);
@@ -2239,12 +2311,26 @@ async function savePdf() {
 
 async function exportFdfFile() {
   if (!S.pdf) return;
-  await stampAnchors(S.annots);
-  progress(null);
-  const bytes = exportFDF(S.annots, { fileName: S.fileName, idHex: S.trailerId });
-  download(bytes, `${baseName()}.fdf`, 'application/vnd.fdf');
-  setDirty(false);
-  toast(`${S.annots.length} comentário(s) exportado(s) para ${baseName()}.fdf`);
+  // escolhe o arquivo primeiro (o navegador exige a ação do usuário para abrir a janela)
+  let target = { kind: 'download', name: `${baseName()}.fdf` };
+  if (FS_API) {
+    let h;
+    try { h = await pickSaveHandle(`${baseName()}.fdf`, FDF_TYPES, S.fdfHandle || S.target?.handle); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return; }
+    if (!h) return; // cancelado
+    target = { kind: 'handle', handle: h };
+  }
+  try {
+    await stampAnchors(S.annots);
+    progress(null);
+    const bytes = exportFDF(S.annots, { fileName: S.fileName, idHex: S.trailerId });
+    await writeTarget(target, bytes, 'application/vnd.fdf');
+    if (target.kind === 'handle') S.fdfHandle = target.handle;
+    setDirty(false);
+    toast(`${S.annots.length} comentário(s) salvo(s) em ${target.kind === 'handle' ? target.handle.name : target.name}`);
+  } catch (e) {
+    console.error(e);
+    toast('Erro ao salvar o FDF: ' + e.message, true);
+  }
 }
 
 async function importFdfFile(file) {
@@ -2290,7 +2376,9 @@ async function importFdfFile(file) {
 
 $('#open-pdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) openPdf(f); };
 $('#import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFdfFile(f); };
-$('#save-pdf').onclick = savePdf;
+$('#save-pdf').onclick = () => savePdf(false);
+$('#save-pdf-as').onclick = () => savePdf(true);
+$('#open-pdf-btn').onclick = openPdfDialog;
 $('#export-fdf').onclick = exportFdfFile;
 $('#zoom-in').onclick = () => setZoom(S.zoomIdx + 1);
 $('#zoom-out').onclick = () => setZoom(S.zoomIdx - 1);
@@ -2308,10 +2396,21 @@ window.addEventListener('drop', (e) => {
   e.preventDefault();
   dragDepth = 0;
   document.body.classList.remove('dragging');
-  for (const f of e.dataTransfer?.files || []) {
-    if (/\.fdf$/i.test(f.name)) importFdfFile(f);
-    else if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') { openPdf(f); break; }
-  }
+  const files = [...(e.dataTransfer?.files || [])];
+  // a referência ao arquivo (para gravar nele) precisa ser pedida durante o próprio evento
+  const handles = [...(e.dataTransfer?.items || [])].filter((it) => it.kind === 'file')
+    .map((it) => (FS_API && it.getAsFileSystemHandle ? it.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null)));
+  (async () => {
+    for (let k = 0; k < files.length; k++) {
+      const f = files[k];
+      if (/\.fdf$/i.test(f.name)) importFdfFile(f);
+      else if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+        const h = await (handles[k] || null);
+        openPdf(f, h && h.kind === 'file' ? { kind: 'handle', handle: h } : null);
+        break;
+      }
+    }
+  })();
 });
 
 window.addEventListener('beforeunload', (e) => {
@@ -2335,8 +2434,8 @@ document.addEventListener('keydown', (e) => {
   const typing = tgt instanceof HTMLElement && (tgt.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tgt.tagName)) && tgt.type !== 'checkbox';
   const mod = e.ctrlKey || e.metaKey;
   if (document.querySelector('dialog[open]')) return;
-  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); savePdf(); return; }
-  if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); $('#open-pdf').click(); return; }
+  if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); savePdf(e.shiftKey); return; }
+  if (mod && e.key.toLowerCase() === 'o') { e.preventDefault(); openPdfDialog(); return; }
   if (e.key === 'Escape') {
     if (typing) { tgt.blur(); return; }
     if (!pv.el.hidden) { hidePreview(); return; }
@@ -2396,7 +2495,7 @@ setDirty(false);
     const name = decodeURIComponent(r.headers.get('X-File-Name') || 'documento.pdf');
     const file = new File([await r.arrayBuffer()], name, { type: 'application/pdf' });
     if (/\.fdf$/i.test(name)) toast('Abra o PDF e depois importe o FDF.', true);
-    else openPdf(file);
+    else openPdf(file, r.headers.get('X-Can-Save') === '1' ? { kind: 'launcher' } : null);
   } catch (e) { console.warn(e); }
 })();
 

@@ -10,6 +10,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -64,7 +65,37 @@ func main() {
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("X-File-Name", url.PathEscape(filepath.Base(initialPath)))
+		w.Header().Set("X-Can-Save", "1")
 		w.Write(data)
+	})
+	// Grava o PDF com os comentários de volta no arquivo recebido na linha de comando.
+	// Grava primeiro num arquivo temporário na mesma pasta e só então substitui o original,
+	// para que uma falha no meio do caminho nunca deixe o arquivo pela metade.
+	mux.HandleFunc("/save-initial", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Query().Get("t") != token || initialPath == "" {
+			http.Error(w, "não permitido", http.StatusForbidden)
+			return
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(initialPath), ".yaynotes-*.tmp")
+		if err != nil {
+			http.Error(w, "não foi possível criar o arquivo temporário: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, err := io.Copy(tmp, http.MaxBytesReader(w, r.Body, 4<<30))
+		if cerr := tmp.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil || n < 5 {
+			os.Remove(tmp.Name())
+			http.Error(w, fmt.Sprintf("falha ao receber o arquivo: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if err := os.Rename(tmp.Name(), initialPath); err != nil {
+			os.Remove(tmp.Name())
+			http.Error(w, "não foi possível substituir o arquivo (está aberto em outro programa?): "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {

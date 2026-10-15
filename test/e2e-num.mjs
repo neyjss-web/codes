@@ -12,7 +12,7 @@ const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 1500, height: 850 }, acceptDownloads: true });
 page.on('pageerror', (e) => console.log('pageerror', e.message));
 const ready = (name) => page.waitForFunction((n) => window.__yaynotes.S.fileName === n && document.querySelector('#loading').hidden && document.querySelector('#progress').hidden, name, { timeout: 30000 });
-await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href);
+await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href + '?download=1');
 
 // Versão 1: marca a Contestação (p. 15–24) e cria uma nota na p. 17
 await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');

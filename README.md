@@ -48,7 +48,7 @@ centenas de páginas. Para isso, o YayNotes:
 | **Texto do comentário** | Só **negrito** (`Ctrl+B`) e **vermelho**, sempre na mesma fonte. Clique duplo num comentário abre a edição. |
 | **Encontrar** | Busca no texto com **próxima/anterior ocorrência**, abas de **Comentários** e **Marcadores** do PDF, e links que funcionam. |
 | **PJe** | Botão **Copiar Num.** copia "2177293507 - Pág. 1" da página atual. |
-| **Salvar** | **Salvar PDF** grava uma cópia com os comentários. **Salvar/Carregar FDF** guarda e recupera só os comentários. |
+| **Salvar** | **Salvar PDF** (`Ctrl+S`) grava os comentários **dentro do próprio arquivo aberto**. **Salvar como…** (`Ctrl+Shift+S`) grava em outro arquivo. **Salvar/Carregar FDF** guarda e recupera só os comentários, pela janela "Salvar como" do Windows. O app não usa os downloads do navegador. |
 
 O FDF salvo pelo YayNotes também abre no **Adobe Acrobat/Reader** (*Comentários → Importar*). Só o reajuste de páginas
 pelo "Num." é exclusivo do YayNotes.

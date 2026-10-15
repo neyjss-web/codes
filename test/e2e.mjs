@@ -13,7 +13,7 @@ const page = await ctx.newPage();
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.type() + ': ' + m.text()); });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
-await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href);
+await page.goto(pathToFileURL(resolve('dist/YayNotes.html')).href + '?download=1');
 await page.setInputFiles('#open-pdf', 'samples/exemplo.pdf');
 await page.waitForFunction(() => window.__yaynotes.S.n === 40 && document.querySelector('#loading').hidden, null, { timeout: 30000 });
 await page.waitForTimeout(1500);
