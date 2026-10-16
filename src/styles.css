@@ -426,3 +426,5 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 .rc-red, .rc .rc-red { color: #d00000; }
 :root[data-theme="dark"] .rc-red { color: #ff6b6b; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rc .rc-red, :root:not([data-theme="light"]) .item .c .rc-red { color: #ff6b6b; } }
+
+#help-dialog .version { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }

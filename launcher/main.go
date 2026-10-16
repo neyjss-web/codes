@@ -8,6 +8,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
 	"fmt"
@@ -224,16 +225,25 @@ func instanceFile() string {
 	return filepath.Join(base, "YayNotes", "instancia.txt")
 }
 
+// Versão do app embutido: uma instância só recebe janelas de um .exe com o mesmo app.
+// Assim, ao trocar o YayNotes.exe por uma versão nova, a nova janela nunca abre a versão antiga.
+func appVersion() string {
+	h := sha256.Sum256(appHTML)
+	return hex.EncodeToString(h[:6])
+}
+
 func writeInstance(addr, token string) {
 	f := instanceFile()
 	os.MkdirAll(filepath.Dir(f), 0o755)
-	os.WriteFile(f, []byte(addr+" "+token), 0o600)
+	os.WriteFile(f, []byte(addr+" "+token+" "+appVersion()), 0o600)
 }
 
 func removeInstance(token string) {
 	f := instanceFile()
-	if b, err := os.ReadFile(f); err == nil && strings.HasSuffix(strings.TrimSpace(string(b)), " "+token) {
-		os.Remove(f)
+	if b, err := os.ReadFile(f); err == nil {
+		if parts := strings.Fields(string(b)); len(parts) >= 2 && parts[1] == token {
+			os.Remove(f)
+		}
 	}
 }
 
@@ -244,8 +254,8 @@ func forwardToRunning(path string) bool {
 		return false
 	}
 	parts := strings.Fields(string(b))
-	if len(parts) != 2 {
-		return false
+	if len(parts) != 3 || parts[2] != appVersion() {
+		return false // instância de outra versão: esta passa a ser a principal
 	}
 	client := http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Post("http://"+parts[0]+"/open?t="+url.QueryEscape(parts[1]), "text/plain; charset=utf-8", strings.NewReader(path))

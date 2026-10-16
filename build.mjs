@@ -44,6 +44,10 @@ async function run() {
   // Ícone (favicon e logotipo) embutido como data URI
   const icon = 'data:image/svg+xml;base64,' + readFileSync(join(root, 'assets', 'yaynotes.svg')).toString('base64');
   html = html.replaceAll('__ICON__', icon);
+  // Versão exibida na ajuda: data da geração + código do conteúdo
+  const stamp = new Date().toISOString().slice(0, 10).replaceAll('-', '.');
+  const hash = (await import('node:crypto')).createHash('sha256').update(code + css).digest('hex').slice(0, 6);
+  html = html.replaceAll('__VERSION__', `${stamp}-${hash}`);
   html = html.replace('/*__CSS__*/', () => css);
   html = html.replace('<script type="module">/*__JS__*/</script>', () =>
     `<script type="application/json" id="pdfjs-assets">${JSON.stringify(assets)}</script>\n<script type="module">${code}</script>`);

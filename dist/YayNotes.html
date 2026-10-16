@@ -433,6 +433,8 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 .rc-red, .rc .rc-red { color: #d00000; }
 :root[data-theme="dark"] .rc-red { color: #ff6b6b; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rc .rc-red, :root:not([data-theme="light"]) .item .c .rc-red { color: #ff6b6b; } }
+
+#help-dialog .version { font-size: 12px; font-weight: normal; color: var(--muted); margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -642,7 +644,7 @@ dialog input[type=color] { width: 56px; height: 32px; border: 1px solid var(--bo
 
 <dialog id="help-dialog">
   <form method="dialog">
-    <h2>Atalhos</h2>
+    <h2>Atalhos <small class="version">YayNotes versão 2026.10.16-c41839</small></h2>
     <table>
       <tr><td><kbd>&lt;</kbd> / <kbd>&gt;</kbd></td><td>Páginas menores (cabem mais) / maiores (cabem menos). Também <kbd>-</kbd> <kbd>+</kbd></td></tr>
       <tr><td>Clique</td><td>Seleciona/desmarca a página</td></tr>
