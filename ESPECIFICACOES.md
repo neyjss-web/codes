@@ -101,6 +101,7 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | O FDF continua abrindo no Adobe Reader? | **Sim.** É um FDF padrão. O Adobe só não faz o reajuste pelo "Num.": coloca cada comentário no mesmo número de página. A formatação (negrito/vermelho) vai no campo padrão de texto formatado (`/RC`). |
 | Salvar o PDF com os comentários **dentro do mesmo arquivo** | **Salvar PDF** grava no próprio arquivo aberto, inclusive quando o PDF é arrastado sobre o `YayNotes.exe`. **Salvar como…** grava em outro arquivo. A gravação é segura: se algo falhar no meio, o arquivo original não é alterado. |
 | Não usar o painel de downloads do navegador | O painel tinha opções perigosas, como desfazer e lixeira, e um arquivo foi perdido por acidente. Agora o PDF é gravado direto no arquivo, e o FDF pela janela "Salvar como" do Windows, que já abre na pasta do PDF. O painel não aparece mais. O Edge pede, uma vez, permissão para o app editar o arquivo. |
+| Duas janelas do mesmo processo, alterando e salvando em qualquer uma | Abra o `YayNotes.exe` de novo (ou arraste o PDF sobre ele): abre outra janela. Com o mesmo PDF aberto nas duas, os comentários ficam **sincronizados**: o que é criado, alterado, excluído, desfeito ou importado de um FDF numa janela aparece na outra em instantes. Salvar o PDF ou o FDF em qualquer janela grava os comentários das duas, e ambas passam a indicar "salvo". `Ctrl+Z` desfaz a última ação da própria janela. Janelas com PDFs diferentes não se misturam. |
 | Rodar em qualquer Windows | O `.exe` é de 32 bits e funciona do Windows 7 ao 11, em 32 ou 64 bits. |
 
 ## 6. Limites conhecidos
@@ -112,6 +113,8 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 - **Posição dentro da página**: o comentário vai para a página certa, mas na mesma posição. Se o documento for
   alterado no PJe (texto reformatado, petição substituída), um realce pode ficar deslocado em relação ao texto.
 - **Adobe Reader**: exibe e importa os comentários, mas não reposiciona pelo "Num.".
+- **Duas janelas**: a sincronização vale para janelas abertas pelo mesmo `YayNotes.exe` (ou abas do mesmo navegador com o
+  `YayNotes.html`). Se as duas mexerem no **mesmo comentário** ao mesmo tempo, fica a última alteração.
 - **Telas pequenas** (menos de 1366 pixels de largura): a barra da visão de página pode ocupar duas linhas.
 
 ## 7. Atalhos de teclado

@@ -189,6 +189,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 function setDirty(v = true) {
   S.dirty = v;
+  if (v) syncSoon();
   document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'YayNotes';
   // Destaca o botão de salvar da leitura contínua quando há alterações não salvas
   $('#ed-save')?.classList.toggle('primary', v);
@@ -287,6 +288,7 @@ async function openPdf(file, target = null) {
     if (warn) toast(warn, true);
     viewer.focus();
     await reviseAnnotations(S.annots, 'do PDF');
+    if (gen === S.gen) await syncJoin();
   } catch (e) {
     console.error(e);
     progress(null);
@@ -2527,14 +2529,21 @@ async function pickSaveHandle(suggestedName, types, startIn) {
   }
 }
 
+// Identificação da janela junto ao YayNotes.exe: chave de acesso (t) e arquivo recebido por esta janela (f)
+function launcherQS() {
+  const q = new URLSearchParams(location.search);
+  const o = new URLSearchParams({ t: q.get('t') || '' });
+  if (q.get('f')) o.set('f', q.get('f'));
+  return o.toString();
+}
+
 async function writeTarget(target, bytes, mime) {
   if (target.kind === 'handle') {
     const w = await target.handle.createWritable();
     await w.write(new Blob([bytes], { type: mime }));
     await w.close();
   } else if (target.kind === 'launcher') {
-    const token = new URLSearchParams(location.search).get('t');
-    const r = await fetch('/save-initial?t=' + encodeURIComponent(token), { method: 'POST', body: bytes });
+    const r = await fetch('/save-initial?' + launcherQS(), { method: 'POST', body: bytes });
     if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
   } else {
     download(bytes, target.name, mime);
@@ -2578,6 +2587,7 @@ async function closePdf() {
   if (E.open) closeEditor();
   hidePreview();
   hideAnnTip();
+  syncLeave();
   S.gen++;
   try { S.task?.destroy(); } catch { /* ignora */ }
   io?.disconnect();
@@ -2619,6 +2629,7 @@ async function savePdf(saveAs = false) {
     progress(0.1, 'Lendo o documento original…');
     await nextPaint();
     await stampAnchors(S.annots);
+    const sig = stateSig();
     const doc = await loadPdfLib(S.bytes.slice());
     progress(0.4, `Gravando ${S.annots.length} comentário(s)…`);
     await nextPaint();
@@ -2635,7 +2646,7 @@ async function savePdf(saveAs = false) {
     // o arquivo gravado passa a ser o arquivo de trabalho
     S.bytes = out;
     if (target.kind !== 'download') { S.target = target; S.fileName = name; }
-    setDirty(false);
+    syncSaved(sig);
     toast(target.kind === 'download'
       ? `PDF salvo com ${S.annots.length} comentário(s): ${name} (pasta Downloads)`
       : `${S.annots.length} comentário(s) gravado(s) dentro de ${name}.`);
@@ -2663,10 +2674,11 @@ async function exportFdfFile() {
   try {
     await stampAnchors(S.annots);
     progress(null);
+    const sig = stateSig();
     const bytes = exportFDF(S.annots, { fileName: S.fileName, idHex: S.trailerId });
     await writeTarget(target, bytes, 'application/vnd.fdf');
     if (target.kind === 'handle') S.fdfHandle = target.handle;
-    setDirty(false);
+    syncSaved(sig);
     toast(`${S.annots.length} comentário(s) salvo(s) em ${target.kind === 'handle' ? target.handle.name : target.name}`);
     return true;
   } catch (e) {
@@ -2843,7 +2855,7 @@ setDirty(false);
   setInterval(ping, 20000);
   document.addEventListener('visibilitychange', ping);
   try {
-    const r = await fetch('/initial?t=' + encodeURIComponent(token));
+    const r = await fetch('/initial?' + launcherQS());
     if (r.status !== 200) return;
     const name = decodeURIComponent(r.headers.get('X-File-Name') || 'documento.pdf');
     const file = new File([await r.arrayBuffer()], name, { type: 'application/pdf' });
@@ -2852,5 +2864,129 @@ setDirty(false);
   } catch (e) { console.warn(e); }
 })();
 
+// ============================================================================
+// Sincronização entre janelas do mesmo processo
+// ============================================================================
+// Várias janelas do YayNotes com o mesmo PDF aberto compartilham os comentários: o que é criado,
+// alterado ou excluído numa janela aparece nas outras, e salvar em qualquer uma grava tudo.
+// Cada janela envia só os comentários que mudaram; a que abre o PDF depois recebe o estado atual.
+const SYNC = { ch: null, win: uid('w'), key: null, base: new Map(), groups: '', timer: 0, applying: false, joining: false };
+try { SYNC.ch = new BroadcastChannel('yaynotes-sync'); } catch { /* navegador sem suporte: janelas independentes */ }
+const annotSig = (a) => JSON.stringify(a);
+const stateSig = () => S.annots.map(annotSig).sort().join('\n');
+
+function syncPost(msg) {
+  try { SYNC.ch?.postMessage({ ...msg, key: SYNC.key, from: SYNC.win }); } catch (e) { console.warn('Sincronização', e); }
+}
+function syncBaseline() {
+  SYNC.base = new Map(S.annots.map((a) => [a.id, annotSig(a)]));
+  SYNC.groups = JSON.stringify(S.groups);
+}
+function syncSoon() {
+  if (!SYNC.ch || !SYNC.key || SYNC.applying) return;
+  clearTimeout(SYNC.timer);
+  SYNC.timer = setTimeout(syncPublish, 120);
+}
+// Envia às outras janelas o que mudou desde o último envio
+function syncPublish() {
+  clearTimeout(SYNC.timer);
+  SYNC.timer = 0;
+  if (!SYNC.ch || !SYNC.key) return;
+  const up = [], seen = new Set();
+  for (const a of S.annots) {
+    seen.add(a.id);
+    const k = annotSig(a);
+    if (SYNC.base.get(a.id) !== k) { up.push(a); SYNC.base.set(a.id, k); }
+  }
+  const del = [...SYNC.base.keys()].filter((id) => !seen.has(id));
+  for (const id of del) SYNC.base.delete(id);
+  const g = JSON.stringify(S.groups);
+  const groups = g !== SYNC.groups ? S.groups : null;
+  SYNC.groups = g;
+  if (up.length || del.length || groups) syncPost({ type: 'ops', up, del, groups });
+}
+// Ao abrir um PDF: procura outra janela com o mesmo arquivo e adota os comentários dela
+async function syncJoin() {
+  if (!SYNC.ch) return;
+  SYNC.key = `${S.fileName}|${S.bytes.length}|${S.n}|${(S.trailerId || []).join('')}`;
+  syncBaseline();
+  SYNC.joining = true;
+  syncPost({ type: 'hello' });
+  await new Promise((r) => { SYNC.joinDone = r; setTimeout(r, 700); });
+  SYNC.joining = false;
+  SYNC.joinDone = null;
+}
+function syncLeave() {
+  if (SYNC.timer) syncPublish();
+  SYNC.key = null;
+  SYNC.joining = false;
+  SYNC.base = new Map();
+}
+// Depois de salvar: marca como salvo aqui e nas outras janelas (se nada mudou durante a gravação)
+function syncSaved(sig) {
+  if (stateSig() === sig) setDirty(false);
+  syncPublish();
+  syncPost({ type: 'saved', sig });
+}
+function syncApply(fn) {
+  SYNC.applying = true;
+  try { fn(); } finally { SYNC.applying = false; }
+}
+function syncAfterRemote() {
+  if (E.selId && !S.annots.some((a) => a.id === E.selId)) E.selId = null;
+  refreshAll();
+  if (E.open) renderProps();
+}
+SYNC.ch?.addEventListener('message', (e) => {
+  const m = e.data;
+  if (!m || m.from === SYNC.win || !SYNC.key || m.key !== SYNC.key) return;
+  if (m.type === 'hello') {
+    if (SYNC.joining) return;
+    syncPublish();
+    syncPost({ type: 'state', to: m.from, annots: S.annots, groups: S.groups, dirty: S.dirty });
+  } else if (m.type === 'state') {
+    if (m.to !== SYNC.win || !SYNC.joining) return;
+    SYNC.joining = false;
+    syncApply(() => {
+      S.annots = m.annots;
+      S.groups = rebuildGroups(S.annots, m.groups);
+      S.undo = [];
+      S.redo = [];
+      syncBaseline();
+      setDirty(!!m.dirty);
+      syncAfterRemote();
+    });
+    toast('Este processo também está aberto em outra janela: os comentários das duas ficam sincronizados.', false, 6000);
+    SYNC.joinDone?.();
+  } else if (m.type === 'ops') {
+    if (SYNC.joining) return;
+    const del = new Set(m.del);
+    const apply = (list) => {
+      const idx = new Map(list.map((a, k) => [a.id, k]));
+      for (const a of m.up) {
+        const c = structuredClone(a), k = idx.get(a.id);
+        if (k == null) list.push(c); else list[k] = c;
+      }
+      return del.size ? list.filter((a) => !del.has(a.id)) : list;
+    };
+    syncApply(() => {
+      S.annots = apply(S.annots);
+      S.groups = rebuildGroups(S.annots, m.groups ? structuredClone(m.groups) : S.groups);
+      // desfazer/refazer desta janela passam a considerar a alteração feita na outra
+      for (const st of [...S.undo, ...S.redo]) {
+        st.annots = apply(st.annots);
+        st.groups = rebuildGroups(st.annots, m.groups ? structuredClone(m.groups) : st.groups);
+      }
+      for (const u of m.up) SYNC.base.set(u.id, annotSig(u));
+      for (const id of del) SYNC.base.delete(id);
+      SYNC.groups = JSON.stringify(S.groups);
+      setDirty(true);
+      syncAfterRemote();
+    });
+  } else if (m.type === 'saved') {
+    if (!SYNC.timer && stateSig() === m.sig) setDirty(false);
+  }
+});
+
 // Exposto para testes automatizados
-window.__yaynotes = { pdfjsLib, DOC_OPTIONS, S, E, openPdf, importFdfFile, exportFdfFile, savePdf, applyGroup, setZoom };
+window.__yaynotes = { pdfjsLib, DOC_OPTIONS, S, E, openPdf, importFdfFile, exportFdfFile, savePdf, applyGroup, setZoom, newAnnot, deleteAnnot, undo: () => restore(S.undo, S.redo) };

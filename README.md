@@ -64,6 +64,9 @@ acompanhar o processo ao longo do tempo, o FDF é o arquivo que importa: o PDF m
 
 **Seus arquivos não saem do seu computador.** O app não envia nada para a internet.
 
+Quer ver duas partes do processo ao mesmo tempo? Abra o `YayNotes.exe` de novo: abre outra janela. Com o mesmo PDF
+nas duas, os comentários ficam **sincronizados**, e dá para alterar e salvar em qualquer uma.
+
 Para trocar de processo sem fechar o app, use **Fechar PDF**. Se houver comentários não salvos, o app pergunta se você
 quer salvar o FDF ou o PDF antes de fechar.
 

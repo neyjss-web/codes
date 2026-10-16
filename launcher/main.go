@@ -3,6 +3,7 @@
 // Contém o aplicativo (YayNotes.html) embutido, serve-o apenas em 127.0.0.1 e o abre
 // numa janela própria do Microsoft Edge (ou Chrome). Se um PDF for passado como argumento
 // (arrastar o arquivo sobre o .exe, ou "Abrir com"), ele é carregado automaticamente.
+// Executar o .exe de novo abre outra janela na instância já aberta (as janelas sincronizam os comentários).
 package main
 
 import (
@@ -18,6 +19,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -27,20 +31,62 @@ var appHTML []byte
 
 var lastPing atomic.Int64
 
-func main() {
-	token := randomToken()
-	var initialPath string
+// Arquivos abertos pelas janelas (cada janela recebe um número, passado no endereço como f=)
+var (
+	filesMu sync.Mutex
+	files   = map[string]string{}
+	nextID  int
+)
+
+func register(path string) string {
+	if path == "" {
+		return ""
+	}
+	filesMu.Lock()
+	defer filesMu.Unlock()
+	nextID++
+	id := strconv.Itoa(nextID)
+	files[id] = path
+	return id
+}
+
+func fileFor(r *http.Request) string {
+	filesMu.Lock()
+	defer filesMu.Unlock()
+	return files[r.URL.Query().Get("f")]
+}
+
+func argPath() string {
 	if len(os.Args) > 1 {
 		if p, err := filepath.Abs(os.Args[1]); err == nil {
 			if st, err := os.Stat(p); err == nil && !st.IsDir() {
-				initialPath = p
+				return p
 			}
 		}
 	}
+	return ""
+}
+
+func main() {
+	initialPath := argPath()
+	// Uma só instância: se o YayNotes já estiver aberto, ele abre a nova janela. Assim todas as
+	// janelas ficam no mesmo endereço e conseguem sincronizar os comentários entre si.
+	if forwardToRunning(initialPath) {
+		return
+	}
+	token := randomToken()
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		fail("Não foi possível iniciar o servidor local: " + err.Error())
+	}
+	addr := ln.Addr().String()
+	windowURL := func(id string) string {
+		u := fmt.Sprintf("http://%s/?t=%s", addr, token)
+		if id != "" {
+			u += "&f=" + id
+		}
+		return u
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -54,17 +100,18 @@ func main() {
 	})
 	// Arquivo passado na linha de comando
 	mux.HandleFunc("/initial", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("t") != token || initialPath == "" {
+		path := fileFor(r)
+		if r.URL.Query().Get("t") != token || path == "" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
-		data, err := os.ReadFile(initialPath)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("X-File-Name", url.PathEscape(filepath.Base(initialPath)))
+		w.Header().Set("X-File-Name", url.PathEscape(filepath.Base(path)))
 		w.Header().Set("X-Can-Save", "1")
 		w.Write(data)
 	})
@@ -72,11 +119,12 @@ func main() {
 	// Grava primeiro num arquivo temporário na mesma pasta e só então substitui o original,
 	// para que uma falha no meio do caminho nunca deixe o arquivo pela metade.
 	mux.HandleFunc("/save-initial", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Query().Get("t") != token || initialPath == "" {
+		path := fileFor(r)
+		if r.Method != http.MethodPost || r.URL.Query().Get("t") != token || path == "" {
 			http.Error(w, "não permitido", http.StatusForbidden)
 			return
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(initialPath), ".yaynotes-*.tmp")
+		tmp, err := os.CreateTemp(filepath.Dir(path), ".yaynotes-*.tmp")
 		if err != nil {
 			http.Error(w, "não foi possível criar o arquivo temporário: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -90,11 +138,28 @@ func main() {
 			http.Error(w, fmt.Sprintf("falha ao receber o arquivo: %v", err), http.StatusInternalServerError)
 			return
 		}
-		if err := os.Rename(tmp.Name(), initialPath); err != nil {
+		if err := os.Rename(tmp.Name(), path); err != nil {
 			os.Remove(tmp.Name())
 			http.Error(w, "não foi possível substituir o arquivo (está aberto em outro programa?): "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	// Pedido de outra execução do YayNotes.exe: abre mais uma janela (com o PDF recebido, se houver)
+	mux.HandleFunc("/open", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Query().Get("t") != token {
+			http.Error(w, "não permitido", http.StatusForbidden)
+			return
+		}
+		body, _ := io.ReadAll(io.LimitReader(r.Body, 32<<10))
+		path := strings.TrimSpace(string(body))
+		if path != "" {
+			if st, err := os.Stat(path); err != nil || st.IsDir() {
+				path = ""
+			}
+		}
+		lastPing.Store(time.Now().Unix())
+		openWindow(windowURL(register(path)))
 		w.WriteHeader(http.StatusNoContent)
 	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada
@@ -104,7 +169,10 @@ func main() {
 	})
 	go http.Serve(ln, mux)
 
-	appURL := fmt.Sprintf("http://%s/?t=%s", ln.Addr().String(), token)
+	writeInstance(addr, token)
+	defer removeInstance(token)
+
+	appURL := windowURL(register(initialPath))
 	fmt.Println(appURL)
 	lastPing.Store(time.Now().Unix())
 
@@ -118,13 +186,62 @@ func main() {
 	} else {
 		openDefaultBrowser(appURL)
 	}
-	// Mantém o servidor enquanto a página enviar sinais de vida
+	// Mantém o servidor enquanto alguma janela enviar sinais de vida
 	for {
 		time.Sleep(15 * time.Second)
 		if time.Since(time.Unix(lastPing.Load(), 0)) > 3*time.Minute {
 			return
 		}
 	}
+}
+
+func openWindow(u string) {
+	if cmd := startAppWindow(u); cmd != nil {
+		go cmd.Wait()
+	} else {
+		openDefaultBrowser(u)
+	}
+}
+
+// Arquivo com o endereço da instância em execução (só o usuário do Windows tem acesso à pasta)
+func instanceFile() string {
+	base := os.Getenv("LOCALAPPDATA")
+	if base == "" {
+		base = os.TempDir()
+	}
+	return filepath.Join(base, "YayNotes", "instancia.txt")
+}
+
+func writeInstance(addr, token string) {
+	f := instanceFile()
+	os.MkdirAll(filepath.Dir(f), 0o755)
+	os.WriteFile(f, []byte(addr+" "+token), 0o600)
+}
+
+func removeInstance(token string) {
+	f := instanceFile()
+	if b, err := os.ReadFile(f); err == nil && strings.HasSuffix(strings.TrimSpace(string(b)), " "+token) {
+		os.Remove(f)
+	}
+}
+
+// Pede à instância já aberta que abra uma nova janela. Devolve false se não houver instância ativa.
+func forwardToRunning(path string) bool {
+	b, err := os.ReadFile(instanceFile())
+	if err != nil {
+		return false
+	}
+	parts := strings.Fields(string(b))
+	if len(parts) != 2 {
+		return false
+	}
+	client := http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Post("http://"+parts[0]+"/open?t="+url.QueryEscape(parts[1]), "text/plain; charset=utf-8", strings.NewReader(path))
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusNoContent
 }
 
 func startAppWindow(appURL string) *exec.Cmd {
