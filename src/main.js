@@ -1136,6 +1136,7 @@ function buildEditorPages(anchor, ratio = 0) {
   }
   E.keep = keep;
   E.keepRot = S.rot;
+  const pre = E.pre?.i === anchor && E.pre.rot === S.rot ? E.pre : null;
   resetEditorPages();
   if (E.fit) {
     // Página inteira: a página cabe por completo na área visível (largura e altura)
@@ -1170,6 +1171,12 @@ function buildEditorPages(anchor, ratio = 0) {
   escroll.scrollTop = el.offsetTop - 12 + ratio * el.offsetHeight;
   // sem quadro em branco: prévias imediatas nas páginas próximas e desenho da página de destino já iniciado
   E.i = anchor;
+  // página de destino já desenhada antes na escala certa: entra pronta, sem novo desenho
+  const ael = epageEl(anchor);
+  if (pre && pre.wd === +ael.dataset.wd && pre.hd === +ael.dataset.hd) {
+    E.keep.set(anchor, pre.canvas);
+    pre.canvas.dataset.pre = '1';
+  }
   for (let k = Math.max(0, anchor - 2); k <= Math.min(S.n - 1, anchor + 2); k++) {
     const pel = epageEl(k), ph = placeholderFor(k);
     if (ph) pel.prepend(ph);
@@ -1225,6 +1232,16 @@ async function renderEPage(i) {
   el.append(draw);
   renderEPageOverlay(i);
   try {
+    if (ph?.dataset.pre && ph.width === canvas.width && ph.height === canvas.height) {
+      // já desenhada na escala certa (troca para uma página de outro tamanho): só passa a valer como página
+      delete ph.dataset.pre;
+      ph.className = 'main';
+      st.markReady();
+      const page = await S.pdf.getPage(i + 1);
+      if (gen !== E.gen || E.pages.get(i) !== st) return;
+      finishEPage(i, st, page, tl, gen);
+      return;
+    }
     const page = await S.pdf.getPage(i + 1);
     if (gen !== E.gen || E.pages.get(i) !== st) return;
     st.task = page.render({ canvas, viewport: page.getViewport({ scale: canvas.width / S.vps[i].width, rotation: rotOf(page) }) });
@@ -1357,9 +1374,28 @@ const navBase = () => E.pendingNav ?? E.i;
 async function gotoEditorPage(i, smooth = false) {
   if (i < 0 || i >= S.n) return;
   if (!E.fit || Math.abs(fitScaleFor(i) - E.scale) > 0.005) {
+    // Página de outro tamanho (comum em páginas digitalizadas) ou zoom alterado: todas as páginas mudam
+    // de escala. Sem "piscar" em branco: a página de destino é desenhada antes, fora da tela, enquanto
+    // a atual continua visível; só então a visão é refeita, já com a página pronta.
+    const tok = (E.navTok = (E.navTok || 0) + 1);
+    E.pendingNav = i;
+    const wait = setTimeout(() => { if (tok === E.navTok && E.open) showPageWait(i); }, 350);
+    let pre = null;
+    try {
+      pre = await Promise.race([prerenderEPage(i, fitScaleFor(i)), new Promise((r) => setTimeout(r, 6000, null))]);
+    } catch (e) {
+      if (e?.name !== 'RenderingCancelledException') console.warn('Falha ao preparar página', i + 1, e);
+    }
+    clearTimeout(wait);
+    if (tok !== E.navTok || !E.open) {
+      if (!E.open || E.pendingNav == null) showPageWait(null);
+      return;
+    }
     E.fit = true;
     E.pendingNav = null;
+    E.pre = pre;
     buildEditorPages(i, 0);
+    E.pre = null;
     return;
   }
   // Sem "piscar": se a página de destino ainda não estiver desenhada, a página atual continua
@@ -1387,6 +1423,20 @@ async function gotoEditorPage(i, smooth = false) {
   if (!el) return;
   escroll.scrollTo({ top: el.offsetTop - 12, behavior: smooth ? 'smooth' : 'auto' });
   setCurrentPage(i, true);
+}
+
+// Desenha a página i, fora da tela, na escala indicada (usada na troca para uma página de outro tamanho)
+async function prerenderEPage(i, scale) {
+  const d = DPRE(), rot = S.rot;
+  const wd = Math.round(S.vps[i].width * scale * d), hd = Math.round(S.vps[i].height * scale * d);
+  const canvas = document.createElement('canvas');
+  canvas.width = wd;
+  canvas.height = hd;
+  const page = await S.pdf.getPage(i + 1);
+  E.preTask?.cancel(); // com várias teclas seguidas, só a última página de destino importa
+  const task = (E.preTask = page.render({ canvas, viewport: page.getViewport({ scale: wd / S.vps[i].width, rotation: rotOf(page) }) }));
+  try { await task.promise; } finally { if (E.preTask === task) E.preTask = null; }
+  return { i, canvas, rot, wd, hd };
 }
 
 function showPageWait(i) {
