@@ -14,6 +14,7 @@
     <button class="btn primary" id="open-pdf-btn" title="Abrir PDF (Ctrl+O)">Abrir PDF</button><input type="file" id="open-pdf" accept="application/pdf,.pdf" hidden>
     <button class="btn" id="save-pdf" disabled title="Gravar os comentários dentro do PDF aberto (Ctrl+S)">Salvar PDF</button>
     <button class="btn" id="save-pdf-as" disabled title="Salvar o PDF com os comentários em outro arquivo (Ctrl+Shift+S)">Salvar como…</button>
+    <button class="btn" id="new-window" disabled title="Abrir este mesmo processo em outra janela (os comentários ficam sincronizados)">⧉ Nova janela</button>
     <button class="btn" id="close-pdf" disabled title="Fechar o PDF e voltar à tela inicial (o YayNotes continua aberto)">Fechar PDF</button>
   </div>
   <div class="tb-group">
@@ -122,6 +123,7 @@
       <span class="sep"></span>
       <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
       <button class="btn" id="ed-copy-num" title="Copiar o número do documento (Num.) impresso no rodapé da página atual">Copiar Num.</button>
+      <button class="btn icon" id="ed-new-window" title="Abrir este mesmo processo em outra janela, nesta página (os comentários ficam sincronizados)">⧉</button>
       <span class="sep"></span>
       <span class="ed-search">
         <input type="search" id="ed-search" placeholder="Buscar no texto…" title="Enter busca; Enter de novo vai para a próxima ocorrência (Shift+Enter: anterior)">
@@ -227,6 +229,7 @@
       <tr><td><kbd>F3</kbd> / <kbd>Shift</kbd>+<kbd>F3</kbd></td><td>Próxima / anterior ocorrência da busca (ou Enter / Shift+Enter no campo de busca)</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfazer / refazer</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Gravar os comentários no PDF aberto / Salvar como outro arquivo</td></tr>
+      <tr><td>⧉ Nova janela</td><td>Abre o mesmo processo em outra janela; os comentários das duas ficam sincronizados e dá para salvar em qualquer uma</td></tr>
       <tr><td colspan="2"><b>Na leitura contínua</b></td></tr>
       <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
       <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd> ou <kbd>←</kbd> / <kbd>→</kbd></td><td>Página anterior / próxima</td></tr>

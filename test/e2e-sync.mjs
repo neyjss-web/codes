@@ -60,6 +60,25 @@ await dl;
 await B.waitForTimeout(500);
 if ((await dirty(A)) || (await dirty(B))) fail(`após salvar em A: A sujo=${await dirty(A)}, B sujo=${await dirty(B)}`);
 
+// botão "Nova janela": abre o mesmo documento, na mesma página, já sincronizado
+await A.evaluate(() => window.__yaynotes.newAnnot({ type: 'Text', page: 7, rect: [100, 100, 120, 120], contents: 'antes da nova janela' }));
+await A.dblclick('.page[data-i="5"]');
+await A.waitForTimeout(800);
+const popupP = ctx.waitForEvent('page');
+await A.click('#ed-new-window');
+const N = await popupP;
+N.on('pageerror', (e) => errors.push('pageerror(N): ' + e.message));
+await N.waitForFunction(() => window.__yaynotes?.S.n === 40 && document.querySelector('#loading').hidden && !document.querySelector('#editor').hidden, null, { timeout: 30000 });
+await N.waitForTimeout(1500);
+if (!(await has(N, 'antes da nova janela'))) fail('nova janela não recebeu o comentário ainda não salvo');
+if ((await count(N)) !== (await count(A))) fail('nova janela com quantidade diferente de comentários');
+const pgN = await N.textContent('#ed-pageno');
+if (!pgN.startsWith('6 /')) fail('nova janela não abriu na mesma página: ' + pgN);
+await N.evaluate(() => window.__yaynotes.newAnnot({ type: 'Text', page: 8, rect: [100, 100, 120, 120], contents: 'feita na nova janela' }));
+await A.waitForTimeout(500);
+if (!(await has(A, 'feita na nova janela')) || !(await has(B, 'feita na nova janela'))) fail('comentário da nova janela não chegou às outras');
+await A.keyboard.press('Escape');
+
 // uma terceira janela com outro PDF não é afetada
 const C = await ctx.newPage();
 await C.goto(url);

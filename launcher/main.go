@@ -158,8 +158,20 @@ func main() {
 				path = ""
 			}
 		}
+		// "Nova janela" no app: mesmo arquivo da janela que pediu (f) e código para ela entregar o documento (w)
+		id := r.URL.Query().Get("f")
+		filesMu.Lock()
+		_, known := files[id]
+		filesMu.Unlock()
+		if path != "" || !known {
+			id = register(path)
+		}
+		u := windowURL(id)
+		if wid := r.URL.Query().Get("w"); wid != "" && len(wid) <= 64 && strings.Trim(wid, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") == "" {
+			u += "&w=" + wid
+		}
 		lastPing.Store(time.Now().Unix())
-		openWindow(windowURL(register(path)))
+		openWindow(u)
 		w.WriteHeader(http.StatusNoContent)
 	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada

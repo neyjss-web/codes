@@ -279,7 +279,7 @@ async function openPdf(file, target = null) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#search']) $(b).disabled = false;
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
@@ -2602,7 +2602,7 @@ async function closePdf() {
   grid.innerHTML = '';
   $('#empty').hidden = false;
   $('#selbar').hidden = true;
-  for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf']) $(b).disabled = true;
+  for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window']) $(b).disabled = true;
   $('#search').value = '';
   $('#search').disabled = true;
   updateSearchUI('');
@@ -2735,6 +2735,8 @@ $('#save-pdf').onclick = () => savePdf(false);
 $('#save-pdf-as').onclick = () => savePdf(true);
 $('#open-pdf-btn').onclick = openPdfDialog;
 $('#close-pdf').onclick = closePdf;
+$('#new-window').onclick = () => openNewWindow();
+$('#ed-new-window').onclick = () => openNewWindow();
 $('#export-fdf').onclick = exportFdfFile;
 $('#zoom-in').onclick = () => setZoom(S.zoomIdx + 1);
 $('#zoom-out').onclick = () => setZoom(S.zoomIdx - 1);
@@ -2854,6 +2856,7 @@ setDirty(false);
   ping();
   setInterval(ping, 20000);
   document.addEventListener('visibilitychange', ping);
+  if (new URLSearchParams(location.search).get('w')) return; // "Nova janela": o documento vem da outra janela
   try {
     const r = await fetch('/initial?' + launcherQS());
     if (r.status !== 200) return;
@@ -2870,7 +2873,7 @@ setDirty(false);
 // Várias janelas do YayNotes com o mesmo PDF aberto compartilham os comentários: o que é criado,
 // alterado ou excluído numa janela aparece nas outras, e salvar em qualquer uma grava tudo.
 // Cada janela envia só os comentários que mudaram; a que abre o PDF depois recebe o estado atual.
-const SYNC = { ch: null, win: uid('w'), key: null, base: new Map(), groups: '', timer: 0, applying: false, joining: false };
+const SYNC = { ch: null, win: uid('w'), key: null, base: new Map(), groups: '', timer: 0, applying: false, joining: false, offers: new Map(), waitW: null, forceKey: null };
 try { SYNC.ch = new BroadcastChannel('yaynotes-sync'); } catch { /* navegador sem suporte: janelas independentes */ }
 const annotSig = (a) => JSON.stringify(a);
 const stateSig = () => S.annots.map(annotSig).sort().join('\n');
@@ -2908,7 +2911,8 @@ function syncPublish() {
 // Ao abrir um PDF: procura outra janela com o mesmo arquivo e adota os comentários dela
 async function syncJoin() {
   if (!SYNC.ch) return;
-  SYNC.key = `${S.fileName}|${S.bytes.length}|${S.n}|${(S.trailerId || []).join('')}`;
+  SYNC.key = SYNC.forceKey || `${S.fileName}|${S.bytes.length}|${S.n}|${(S.trailerId || []).join('')}`;
+  SYNC.forceKey = null;
   syncBaseline();
   SYNC.joining = true;
   syncPost({ type: 'hello' });
@@ -2939,7 +2943,17 @@ function syncAfterRemote() {
 }
 SYNC.ch?.addEventListener('message', (e) => {
   const m = e.data;
-  if (!m || m.from === SYNC.win || !SYNC.key || m.key !== SYNC.key) return;
+  if (!m || m.from === SYNC.win) return;
+  // "Nova janela": a janela nova pede o documento a esta, que o entrega uma única vez
+  if (m.type === 'doc-req') {
+    if (S.pdf && SYNC.offers.has(m.w)) { SYNC.offers.delete(m.w); sendDocTo(m.w); }
+    return;
+  }
+  if (m.type === 'doc') {
+    if (m.w && m.w === SYNC.waitW) { SYNC.waitW = null; receiveDoc(m); }
+    return;
+  }
+  if (!SYNC.key || m.key !== SYNC.key) return;
   if (m.type === 'hello') {
     if (SYNC.joining) return;
     syncPublish();
@@ -2987,6 +3001,70 @@ SYNC.ch?.addEventListener('message', (e) => {
     if (!SYNC.timer && stateSig() === m.sig) setDirty(false);
   }
 });
+
+// ---- Nova janela com o mesmo documento ----
+// A janela nova abre o mesmo PDF (recebido desta janela, sem procurar o arquivo de novo) e entra
+// na sincronização; abre na mesma página.
+async function openNewWindow() {
+  if (!S.pdf) return;
+  if (!SYNC.ch) { toast('Este navegador não permite sincronizar janelas.', true); return; }
+  if (SYNC.timer) syncPublish();
+  const w = uid('n').replace(/[^A-Za-z0-9]/g, '');
+  SYNC.offers.set(w, Date.now());
+  setTimeout(() => SYNC.offers.delete(w), 120000);
+  const q = new URLSearchParams(location.search);
+  if (/^https?:$/.test(location.protocol) && q.get('t')) {
+    // pelo YayNotes.exe: abre uma janela própria do app
+    try {
+      const r = await fetch(`/open?${launcherQS()}&w=${w}`, { method: 'POST', body: '' });
+      if (r.ok) { toast('Abrindo nova janela…', false, 2500); return; }
+    } catch { /* tenta pelo navegador */ }
+  }
+  const u = new URL(location.href);
+  u.searchParams.set('w', w);
+  const win = window.open(u.href, '_blank', 'popup=yes,width=1400,height=900');
+  if (!win) toast('O navegador bloqueou a nova janela. Permita pop-ups para o YayNotes e tente de novo.', true);
+}
+
+function sendDocTo(w) {
+  const msg = {
+    type: 'doc', w, key: SYNC.key, from: SYNC.win, name: S.fileName, bytes: S.bytes, target: S.target,
+    page: E.open ? E.i : currentGridPage(), editor: E.open,
+  };
+  try { SYNC.ch.postMessage(msg); } catch {
+    // o acesso ao arquivo (permissão de gravar) não pôde ser passado: a nova janela usará "Salvar como"
+    SYNC.ch.postMessage({ ...msg, target: msg.target?.kind === 'launcher' ? msg.target : null });
+  }
+}
+
+async function receiveDoc(m) {
+  SYNC.forceKey = m.key;
+  await openPdf(new File([m.bytes], m.name, { type: 'application/pdf' }), m.target || null);
+  if (!S.pdf) return;
+  const i = Math.max(0, Math.min(S.n - 1, m.page || 0));
+  if (m.editor) openEditor(i); else scrollToPage(i, false);
+}
+
+// Página do topo da grade (para a nova janela abrir no mesmo lugar)
+function currentGridPage() {
+  const top = viewer.getBoundingClientRect().top;
+  for (const el of grid.children) if (el.getBoundingClientRect().bottom > top + 8) return +el.dataset.i || 0;
+  return 0;
+}
+
+// Esta janela foi aberta por "Nova janela": pede o documento à janela que a abriu
+const NEW_WIN = new URLSearchParams(location.search).get('w');
+if (NEW_WIN && SYNC.ch) {
+  SYNC.waitW = NEW_WIN;
+  toast('Abrindo o documento da outra janela…', false, 3000);
+  (async () => {
+    for (let k = 0; k < 30 && SYNC.waitW; k++) {
+      SYNC.ch.postMessage({ type: 'doc-req', w: NEW_WIN, from: SYNC.win });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (SYNC.waitW) { SYNC.waitW = null; toast('Não foi possível receber o documento da outra janela. Use Abrir PDF.', true); }
+  })();
+}
 
 // Exposto para testes automatizados
 window.__yaynotes = { pdfjsLib, DOC_OPTIONS, S, E, openPdf, importFdfFile, exportFdfFile, savePdf, applyGroup, setZoom, newAnnot, deleteAnnot, undo: () => restore(S.undo, S.redo) };
