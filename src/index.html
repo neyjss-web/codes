@@ -14,12 +14,15 @@
     <button class="btn primary" id="open-pdf-btn" title="Abrir PDF (Ctrl+O)">Abrir PDF</button><input type="file" id="open-pdf" accept="application/pdf,.pdf" hidden>
     <button class="btn" id="save-pdf" disabled title="Gravar os comentários dentro do PDF aberto (Ctrl+S)">Salvar PDF</button>
     <button class="btn" id="save-pdf-as" disabled title="Salvar o PDF com os comentários em outro arquivo (Ctrl+Shift+S)">Salvar como…</button>
-    <button class="btn" id="new-window" disabled title="Abrir este mesmo processo em outra janela (os comentários ficam sincronizados)">⧉ Nova janela</button>
     <button class="btn" id="close-pdf" disabled title="Fechar o PDF e voltar à tela inicial (o YayNotes continua aberto)">Fechar PDF</button>
   </div>
   <div class="tb-group">
     <label class="btn" id="import-fdf-btn" title="Carregar comentários de um arquivo FDF">Carregar FDF<input type="file" id="import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
     <button class="btn" id="export-fdf" disabled title="Salvar todos os comentários em um arquivo FDF">Salvar FDF</button>
+  </div>
+  <div class="tb-group">
+    <button class="btn" id="new-window" disabled title="Abrir este mesmo processo em outra janela (os comentários ficam sincronizados)">⧉ Nova janela</button>
+    <button class="btn" id="copy-num" disabled title="Copiar o número do documento (Num.) impresso no rodapé da página selecionada (ou da primeira página visível)">Copiar Num.</button>
   </div>
   <div class="tb-group zoom" title="Tamanho das miniaturas — também pelas teclas &lt; e &gt;">
     <span class="zoom-cap">Miniaturas</span>
@@ -111,7 +114,7 @@
   <div class="ed-center">
     <div class="ed-bar">
       <button class="btn icon" id="ed-prev" title="Página anterior (PageUp ou ←)">▲</button>
-      <span id="ed-pageno"></span>
+      <span id="ed-pageno"><input type="text" id="ed-pagein" inputmode="numeric" autocomplete="off" title="Digite o número da página e tecle Enter" aria-label="Página"><span id="ed-pagetot"></span></span>
       <button class="btn icon" id="ed-next" title="Próxima página (PageDown ou →)">▼</button>
       <span class="sep"></span>
       <button class="btn icon" id="ed-zoom-out" title="Reduzir (&lt;)">−</button>
@@ -123,7 +126,6 @@
       <span class="sep"></span>
       <button class="btn" id="ed-copy-text" title="Copiar o texto da página atual">Copiar texto</button>
       <button class="btn" id="ed-copy-num" title="Copiar o número do documento (Num.) impresso no rodapé da página atual">Copiar Num.</button>
-      <button class="btn icon" id="ed-new-window" title="Abrir este mesmo processo em outra janela, nesta página (os comentários ficam sincronizados)">⧉</button>
       <span class="sep"></span>
       <span class="ed-search">
         <input type="search" id="ed-search" placeholder="Buscar no texto…" title="Enter busca; Enter de novo vai para a próxima ocorrência (Shift+Enter: anterior)">
@@ -135,6 +137,7 @@
       <label class="btn" id="ed-import-fdf-btn" title="Carregar comentários de um arquivo FDF">Carregar FDF<input type="file" id="ed-import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
       <button class="btn" id="ed-fdf" title="Exportar todos os comentários para um arquivo FDF">Salvar FDF</button>
       <button class="btn" id="ed-save" title="Gravar os comentários dentro do PDF aberto (Ctrl+S)">Salvar PDF</button>
+      <button class="btn icon" id="ed-new-window" title="Abrir este mesmo processo em outra janela, nesta página (os comentários ficam sincronizados)">⧉</button>
       <button class="btn" id="ed-close" title="Fechar e voltar à grade de páginas (Esc)"><span class="lbl">Fechar </span>✕</button>
     </div>
     <div class="ed-scroll" tabindex="-1"><div class="epages tool-select"></div></div>
@@ -199,7 +202,7 @@
     <label class="chk"><input type="checkbox" name="corner"> Nota no canto superior direito (em vez do esquerdo)</label>
     <p class="hint" id="gd-hint"></p>
     <div class="actions">
-      <button value="cancel" class="btn">Cancelar</button>
+      <button value="cancel" class="btn" formnovalidate>Cancelar</button>
       <button value="ok" class="btn primary" id="gd-ok">Aplicar</button>
     </div>
   </form>

@@ -13,6 +13,9 @@
   --match: #f59e0b;
   --shadow: 0 1px 3px rgb(16 24 40 / 0.18);
   --pw: 200px;
+  --warn: #d97706;
+  --warn-bg: #fef3c7;
+  --warn-text: #7c2d12;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -28,12 +31,14 @@
     --danger: #ff6b6b;
     --sel: #6e9bff;
     --shadow: 0 1px 3px rgb(0 0 0 / 0.5);
+    --warn: #f59e0b; --warn-bg: rgb(245 158 11 / 0.18); --warn-text: #fcd34d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #15181e; --panel: #1f232b; --panel-2: #262b35; --text: #e6e9ef; --muted: #9aa3b2; --border: #363c48;
   --accent: #6e9bff; --accent-soft: rgb(110 155 255 / 0.16); --danger: #ff6b6b; --sel: #6e9bff; color-scheme: dark;
+  --warn: #f59e0b; --warn-bg: rgb(245 158 11 / 0.18); --warn-text: #fcd34d;
 }
 
 * { box-sizing: border-box; }
@@ -63,6 +68,9 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 .btn:hover:not(:disabled) { border-color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Salvar PDF / Salvar FDF com alterações ainda não salvas */
+.btn.unsaved { background: var(--warn-bg); border-color: var(--warn); color: var(--warn-text); font-weight: 600; }
+.btn.unsaved::before { content: "●"; font-size: 9px; color: var(--warn); }
 .btn.danger { color: var(--danger); }
 .btn.icon { min-width: 30px; justify-content: center; padding: 4px 6px; font-weight: 600; }
 .zoom #zoom-label { min-width: 70px; text-align: center; color: var(--muted); font-size: 12px; }
@@ -210,6 +218,12 @@ svg.ann .handle { fill: var(--accent); stroke: #fff; stroke-width: 1px; vector-e
 .ed-bar .sep { width: 1px; height: 22px; background: var(--border); }
 .ed-bar .grow { flex: 1; }
 #ed-zoom, #ed-pageno { min-width: 60px; text-align: center; color: var(--muted); font-size: 12px; }
+#ed-pageno { display: inline-flex; align-items: center; gap: 4px; }
+#ed-pagein {
+  width: 52px; text-align: right; font: inherit; font-size: 13px; color: var(--text); background: var(--panel);
+  border: 1px solid var(--border); border-radius: 5px; padding: 3px 5px;
+}
+#ed-pagein:focus { outline: none; border-color: var(--accent); }
 .ed-scroll { flex: 1; overflow: auto; padding: 12px 16px 40px; position: relative; outline: none; }
 .epages { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
 .epage { position: relative; flex: none; background: #fff; box-shadow: var(--shadow); }

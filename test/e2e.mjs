@@ -52,7 +52,7 @@ await page.screenshot({ path: `${OUT}/3-hover.png` });
 await page.mouse.move(5, 5);
 await page.dblclick('.page[data-i="2"]');
 await page.waitForSelector('.epage[data-i="2"] .textLayer span', { timeout: 10000 });
-console.log('página atual ao abrir:', await page.textContent('#ed-pageno'));
+console.log('página atual ao abrir:', await page.evaluate(() => document.querySelector('#ed-pagein').value + ' ' + document.querySelector('#ed-pagetot').textContent));
 await page.keyboard.press('h');
 const span = page.locator('.epage[data-i="2"] .textLayer span').nth(3);
 const box = await span.boundingBox();
@@ -78,7 +78,7 @@ const listInfo = await page.evaluate(() => ({
 console.log('lista do arquivo:', listInfo);
 await page.locator('#ed-list .item', { hasText: 'Verificar valor da causa' }).click();
 await page.waitForTimeout(400);
-console.log('após clicar no comentário da p. 1:', await page.textContent('#ed-pageno'), 'selecionado:', await page.evaluate(() => !!window.__yaynotes.E.selId));
+console.log('após clicar no comentário da p. 1:', await page.evaluate(() => document.querySelector('#ed-pagein').value + ' ' + document.querySelector('#ed-pagetot').textContent), 'selecionado:', await page.evaluate(() => !!window.__yaynotes.E.selId));
 
 // 3) Hiperlink interno na página 1 (índice → Contestação, fls. 15)
 await page.keyboard.press('Escape');
@@ -86,7 +86,7 @@ await page.waitForSelector('.epage[data-i="0"] .links .lnk');
 const nLinks = await page.locator('.epage[data-i="0"] .links .lnk').count();
 await page.locator('.epage[data-i="0"] .links .lnk').nth(2).click();
 await page.waitForTimeout(500);
-console.log('links na p. 1:', nLinks, '| após clicar no link da Contestação:', await page.textContent('#ed-pageno'));
+console.log('links na p. 1:', nLinks, '| após clicar no link da Contestação:', await page.evaluate(() => document.querySelector('#ed-pagein').value + ' ' + document.querySelector('#ed-pagetot').textContent));
 const [popup] = await Promise.all([page.waitForEvent('popup', { timeout: 5000 }).catch(() => null), page.evaluate(() => {}).then(async () => {
   await page.locator('#ed-prev').click(); // garante que a página 1 esteja montada
   await page.evaluate(() => document.querySelector('.ed-scroll').scrollTo(0, 0));
@@ -99,7 +99,7 @@ if (popup) await popup.close();
 // 2) Rolagem sequencial
 await page.evaluate(() => { const s = document.querySelector('.ed-scroll'); s.scrollTop = s.scrollHeight / 2; });
 await page.waitForTimeout(600);
-console.log('rolagem para o meio → página atual:', await page.textContent('#ed-pageno'),
+console.log('rolagem para o meio → página atual:', await page.evaluate(() => document.querySelector('#ed-pagein').value + ' ' + document.querySelector('#ed-pagetot').textContent),
   '| páginas montadas:', await page.evaluate(() => [...window.__yaynotes.E.pages.keys()].sort((a, b) => a - b).join(',')));
 await page.screenshot({ path: `${OUT}/6-scroll.png` });
 await page.keyboard.press('Escape'); // fecha

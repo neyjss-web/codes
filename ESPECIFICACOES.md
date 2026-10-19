@@ -39,6 +39,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Ampliar a página sob o mouse e destacar os comentários | A **lupa** mostra a página grande ao lado, com os comentários numerados e listados. A tecla `L` liga e desliga. |
 | Selecionar dezenas de páginas e marcar todas com um único comentário | Clique (ou `Shift`+clique, ou digite `1-30, 45`) e use **Marcar seleção com comentário…**. Informe o rótulo (ex.: "Contestação"), o texto, a cor e se quer moldura. A marcação pode ser editada ou excluída de uma vez. |
 | Fechar o PDF e manter o app aberto | Botão **Fechar PDF**: volta à tela inicial. Se houver comentários não salvos, pergunta: *Salvar PDF e fechar*, *Salvar FDF e fechar*, *Fechar sem salvar* ou *Cancelar*. |
+| Copiar o "Num." também nas miniaturas | Botão **Copiar Num.**, igual ao da visão de página: mostra e copia o Num. da página clicada por último (ou, sem seleção, da primeira página visível). |
 | Avisar que o PDF está carregando | Caixa "Carregando arquivo PDF…" com etapas e barra de progresso. |
 
 ### 2.2 Visão de página (clique duplo numa miniatura)
@@ -50,11 +51,13 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Girar a página de 90 em 90 graus | `Ctrl + "+"` gira para a direita e `Ctrl + "-"` para a esquerda (botões ⟳ ⟲ na visão de página). Vale para a grade e para a visão de página. Só muda a exibição: o PDF salvo não é girado. |
 | Página nítida | A página é desenhada com exatamente os pixels da tela e alinhada a eles, em qualquer escala do Windows (100%, 125%, 150%, 250%…). Assim a imagem não é esticada nem fica meio pixel deslocada, o que a deixava embaçada. |
 | Troca de página sem "piscar" | A página nova é desenhada fora da tela e só aparece pronta. Se ainda não estiver pronta, a página atual continua visível até ela ficar pronta (no máximo 6 s), com o aviso "Carregando página…" se demorar. Enquanto você lê, o app já desenha a próxima, a seguinte e a anterior. O desenho usa a placa de vídeo, o que deixa as páginas digitalizadas (imagens pesadas) prontas mais rápido e sem travar a tela. Quando a próxima página tem outro tamanho (comum em páginas digitalizadas), ela é desenhada antes, fora da tela, e a troca só acontece com ela pronta: a tela não fica branca. Num reajuste de zoom, as páginas já desenhadas continuam na tela até a nova versão ficar pronta. A página de destino é sempre desenhada primeiro. |
+| Ir direto para uma página | Digite o número no campo da página (ao lado de ▲ ▼) e tecle `Enter`. |
 | Botão "Página inteira" (no lugar de "Largura") | Botão **Página inteira** (ou tecla `0`). |
 | Ver o texto do PDF | O texto pode ser selecionado e copiado. O botão **Copiar texto** copia a página atual. |
 | Copiar o "Num." do PJe | **Copiar Num.** copia, por exemplo, `2177293507 - Pág. 1`, lido do rodapé da página. |
 | Links do PDF funcionando | Links internos (índices) saltam para a página. Links externos abrem no navegador. |
-| Salvar e carregar sem voltar à tela inicial | Botões **Carregar FDF**, **Salvar FDF** e **Salvar PDF**. Este fica azul quando há algo não salvo. |
+| Salvar e carregar sem voltar à tela inicial | Botões **Carregar FDF**, **Salvar FDF** e **Salvar PDF**. |
+| Saber quando é preciso salvar | Havendo alteração não salva, **Salvar PDF** e **Salvar FDF** ficam em destaque (amarelo, com um ●), nas miniaturas e na visão de página. |
 
 ### 2.3 Painel lateral
 
@@ -68,6 +71,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Pedido | Como ficou |
 |---|---|
 | Passar para a próxima ocorrência | Mostra "3 de 12 · p. 875". Use ▲ ▼, `Enter` e `Shift+Enter`, ou `F3` e `Shift+F3`. Na visão de página, a palavra encontrada fica destacada em laranja. |
+| Continuar a busca a partir de onde estou | Nas miniaturas, ao clicar numa página, a próxima ocorrência (ou a anterior) é procurada a partir dela. Na visão de página, a partir da página atual. Uma busca nova também começa nesse ponto. |
 
 ## 3. Comentários
 

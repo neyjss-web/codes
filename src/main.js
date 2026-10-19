@@ -191,8 +191,13 @@ function setDirty(v = true) {
   S.dirty = v;
   if (v) syncSoon();
   document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'YayNotes';
-  // Destaca o botão de salvar da leitura contínua quando há alterações não salvas
-  $('#ed-save')?.classList.toggle('primary', v);
+  // Destaca os botões de salvar (PDF e FDF) quando há alterações não salvas
+  for (const id of ['#save-pdf', '#export-fdf', '#ed-save', '#ed-fdf']) {
+    const b = $(id);
+    if (!b) continue;
+    b.classList.toggle('unsaved', v);
+    b.title = b.title.replace(/ — há alterações não salvas$/, '') + (v ? ' — há alterações não salvas' : '');
+  }
 }
 
 // ---- Desfazer / refazer ----
@@ -261,7 +266,7 @@ async function openPdf(file, target = null) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, target, fdfHandle: null, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '',
+      sel: new Set(), lastClicked: null, searchFrom: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
@@ -279,7 +284,7 @@ async function openPdf(file, target = null) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#search']) $(b).disabled = false;
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num', '#search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
@@ -680,6 +685,7 @@ grid.addEventListener('click', (e) => {
     S.sel.has(i) ? S.sel.delete(i) : S.sel.add(i);
   }
   S.lastClicked = i;
+  S.searchFrom = i; // a próxima busca continua a partir desta página
   updateSelectionUI();
 });
 
@@ -701,6 +707,7 @@ function updateSelectionUI() {
   $('#mark-group').disabled = !n;
   $('#sel-clear').disabled = !n;
   $('#sel-search').hidden = !S.matches.size;
+  updateGridNum();
 }
 
 const truncate = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
@@ -1327,7 +1334,8 @@ function setCurrentPage(i, force = false) {
   pumpEPages();
   updateOutlineCurrent(i);
   updateNumButton(i);
-  $('#ed-pageno').textContent = `${i + 1} / ${S.n}`;
+  if (document.activeElement !== $('#ed-pagein')) $('#ed-pagein').value = i + 1;
+  $('#ed-pagetot').textContent = `/ ${S.n}`;
   $('#ed-prev').disabled = i === 0;
   $('#ed-next').disabled = i === S.n - 1;
   for (const h of $$('#ed-list .pg-h.cur')) h.classList.remove('cur');
@@ -1617,6 +1625,25 @@ $('#ed-save').onclick = () => savePdf(false);
 $('#ed-fdf').onclick = () => exportFdfFile();
 $('#ed-import-fdf').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFdfFile(f); };
 $('#ed-prev').onclick = () => gotoEditorPage(navBase() - 1);
+// Ir para a página digitada
+{
+  const pin = $('#ed-pagein');
+  pin.addEventListener('focus', () => pin.select());
+  pin.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const p = parseInt(pin.value.replace(/\D/g, ''), 10);
+      if (!p || p < 1 || p > S.n) { toast(`Digite uma página de 1 a ${S.n}.`, true); pin.select(); return; }
+      escroll.focus();
+      gotoEditorPage(p - 1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      escroll.focus();
+    }
+  });
+  pin.addEventListener('blur', () => { if (E.open) pin.value = E.i + 1; });
+}
 $('#ed-next').onclick = () => gotoEditorPage(navBase() + 1);
 $('#ed-zoom-in').onclick = () => zoomEditor(1.2);
 $('#ed-zoom-out').onclick = () => zoomEditor(1 / 1.2);
@@ -1631,23 +1658,37 @@ async function getPageNum(i) {
   return np ? np.num + (np.pag != null ? ` - Pág. ${np.pag}` : '') : null;
 }
 
-let numGen = 0;
-async function updateNumButton(i) {
-  const g = ++numGen;
-  const btn = $('#ed-copy-num');
-  const num = await getPageNum(i).catch(() => null);
-  if (g !== numGen) return;
+const numGen = {};
+async function updateNumButton(i, id = '#ed-copy-num') {
+  const g = (numGen[id] = (numGen[id] || 0) + 1);
+  const btn = $(id);
+  const num = S.pdf ? await getPageNum(i).catch(() => null) : null;
+  if (g !== numGen[id]) return;
   btn.innerHTML = num ? `Copiar Num. <span class="num">${num}</span>` : 'Copiar Num.';
-  btn.title = num ? `Copiar “${num}” (rodapé da página ${i + 1})` : 'Copiar o número do documento (Num.) impresso no rodapé da página atual';
-  btn.dataset.num = num || '';
+  btn.title = num ? `Copiar “${num}” (rodapé da página ${i + 1})` : 'Copiar o número do documento (Num.) impresso no rodapé da página';
+  btn.dataset.page = i;
 }
 
-$('#ed-copy-num').onclick = async () => {
-  const i = E.i;
+async function copyNum(i) {
   const num = await getPageNum(i);
   if (!num) { toast(`Não encontrei “Num.” no texto da página ${i + 1}.`, true); return; }
   try { await navigator.clipboard.writeText(num); toast(`“${num}” copiado (página ${i + 1}).`); } catch { toast('Não foi possível acessar a área de transferência.', true); }
-};
+}
+$('#ed-copy-num').onclick = () => copyNum(E.i);
+
+// Na tela de miniaturas: Num. da página clicada por último (ou da primeira página visível)
+const gridNumPicked = () => S.lastClicked != null && S.sel.has(S.lastClicked);
+const gridNumPage = () => (gridNumPicked() ? S.lastClicked : currentGridPage());
+function updateGridNum() {
+  if (!S.pdf) { $('#copy-num').textContent = 'Copiar Num.'; return; }
+  updateNumButton(gridNumPage(), '#copy-num');
+}
+$('#copy-num').onclick = () => { if (S.pdf) copyNum(gridNumPage()); };
+let gridNumRaf = 0;
+viewer.addEventListener('scroll', () => {
+  if (gridNumRaf || gridNumPicked() || E.open) return;
+  gridNumRaf = requestAnimationFrame(() => { gridNumRaf = 0; updateGridNum(); });
+}, { passive: true });
 
 $('#ed-copy-text').onclick = async () => {
   const txt = await getPageText(E.i);
@@ -2308,6 +2349,8 @@ async function runSearch(term) {
   const t = normNoSpace(term);
   syncSearchInputs(term);
   if (!t) { updateSearchUI(''); updateSelectionUI(); return; }
+  const from = searchAnchor() ?? 0;
+  S.searchFrom = null;
   for (let i = 0; i < S.n; i++) {
     const txt = await getPageText(i);
     if (gen !== searchGen) return;
@@ -2316,10 +2359,12 @@ async function runSearch(term) {
       S.matches.add(i);
       pageEl(i).classList.add('match');
       for (let k = 0; k < c; k++) S.occ.push({ page: i, k });
-      if (S.occIdx < 0) gotoOcc(0);
+      // a busca começa na página selecionada (miniaturas) ou na página atual (leitura)
+      if (S.occIdx < 0 && i >= from) gotoOcc(S.occ.length - c);
     }
     if (i % 20 === 0) updateSearchUI(`buscando… ${i + 1}/${S.n}`);
   }
+  if (S.occIdx < 0 && S.occ.length) gotoOcc(0); // nada depois da página de partida: volta ao início
   updateSearchUI();
   if (!S.occ.length) { const withText = [...S.text.values()].some((x) => x.trim()); if (!withText) toast('Este PDF parece não ter texto (digitalizado sem OCR).', true); }
   updateSelectionUI();
@@ -2335,6 +2380,30 @@ function updateSearchUI(msg) {
 
 function syncSearchInputs(term) {
   for (const id of ['#search', '#ed-search']) if ($(id).value.trim() !== term) $(id).value = term;
+}
+
+// Página de onde a busca deve continuar: a clicada nas miniaturas ou, na leitura, a página atual
+// (quando o usuário saiu da página da última ocorrência). null = continuar da última ocorrência.
+function searchAnchor() {
+  const cur = S.occ?.[S.occIdx]?.page;
+  if (E.open) { const p = navBase(); return p !== cur ? p : null; }
+  return S.searchFrom != null && S.searchFrom !== cur ? S.searchFrom : null;
+}
+
+// Próxima (d = 1) ou anterior (d = -1) ocorrência, a partir da página escolhida pelo usuário
+function stepOcc(d) {
+  const n = S.occ?.length || 0;
+  if (!n) return;
+  const from = searchAnchor();
+  S.searchFrom = null;
+  if (from == null) return gotoOcc(S.occIdx + d);
+  if (d > 0) {
+    const k = S.occ.findIndex((o) => o.page >= from);
+    return gotoOcc(k < 0 ? 0 : k);
+  }
+  let k = -1;
+  for (let j = n - 1; j >= 0; j--) if (S.occ[j].page <= from) { k = j; break; }
+  return gotoOcc(k < 0 ? n - 1 : k);
 }
 
 // Vai para a ocorrência idx (com volta ao início/fim)
@@ -2378,7 +2447,7 @@ function searchKey(e) {
   const term = e.target.value.trim();
   if (e.key === 'Enter') {
     e.preventDefault();
-    if (term && term === S.searchTerm && S.occ?.length) gotoOcc(S.occIdx + (e.shiftKey ? -1 : 1));
+    if (term && term === S.searchTerm && S.occ?.length) stepOcc(e.shiftKey ? -1 : 1);
     else runSearch(term);
   }
   if (e.key === 'Escape') { e.target.value = ''; runSearch(''); (E.open ? escroll : viewer).focus(); }
@@ -2388,7 +2457,7 @@ for (const id of ['#search', '#ed-search']) {
   $(id).addEventListener('search', (e) => { if (!e.target.value) runSearch(''); });
 }
 for (const [id, d] of [['#search-prev', -1], ['#search-next', 1], ['#ed-search-prev', -1], ['#ed-search-next', 1]]) {
-  $(id).onclick = () => gotoOcc(S.occIdx + d);
+  $(id).onclick = () => stepOcc(d);
 }
 
 // ============================================================================
@@ -2596,13 +2665,13 @@ async function closePdf() {
   pv.cache.clear();
   Object.assign(S, {
     fileName: '', target: null, fdfHandle: null, bytes: null, pdf: null, task: null, n: 0, vps: [], annots: [], groups: [],
-    sel: new Set(), lastClicked: null, canWrite: false, trailerId: null, text: new Map(), links: new Map(), anchors: new Map(),
+    sel: new Set(), lastClicked: null, searchFrom: null, canWrite: false, trailerId: null, text: new Map(), links: new Map(), anchors: new Map(),
     matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '', undo: [], redo: [],
   });
   grid.innerHTML = '';
   $('#empty').hidden = false;
   $('#selbar').hidden = true;
-  for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window']) $(b).disabled = true;
+  for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num']) $(b).disabled = true;
   $('#search').value = '';
   $('#search').disabled = true;
   updateSearchUI('');
@@ -2808,7 +2877,7 @@ document.addEventListener('keydown', (e) => {
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? restore(S.redo, S.undo) : restore(S.undo, S.redo); return; }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); restore(S.redo, S.undo); return; }
   if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); const f = $(E.open ? '#ed-search' : '#search'); f.focus(); f.select(); return; }
-  if (e.key === 'F3') { e.preventDefault(); gotoOcc(S.occIdx + (e.shiftKey ? -1 : 1)); return; }
+  if (e.key === 'F3') { e.preventDefault(); stepOcc(e.shiftKey ? -1 : 1); return; }
   if (e.key === 'F1' || e.key === '?') { e.preventDefault(); $('#help-dialog').showModal(); return; }
   if (!S.pdf) return;
   // Tamanho das páginas: < menor (cabem mais), > maior (cabem menos)

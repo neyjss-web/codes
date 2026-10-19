@@ -72,8 +72,8 @@ await N.waitForFunction(() => window.__yaynotes?.S.n === 40 && document.querySel
 await N.waitForTimeout(1500);
 if (!(await has(N, 'antes da nova janela'))) fail('nova janela não recebeu o comentário ainda não salvo');
 if ((await count(N)) !== (await count(A))) fail('nova janela com quantidade diferente de comentários');
-const pgN = await N.textContent('#ed-pageno');
-if (!pgN.startsWith('6 /')) fail('nova janela não abriu na mesma página: ' + pgN);
+const pgN = await N.inputValue('#ed-pagein');
+if (pgN !== '6') fail('nova janela não abriu na mesma página: ' + pgN);
 await N.evaluate(() => window.__yaynotes.newAnnot({ type: 'Text', page: 8, rect: [100, 100, 120, 120], contents: 'feita na nova janela' }));
 await A.waitForTimeout(500);
 if (!(await has(A, 'feita na nova janela')) || !(await has(B, 'feita na nova janela'))) fail('comentário da nova janela não chegou às outras');
