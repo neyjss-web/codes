@@ -4,6 +4,7 @@ import (
 	"errors"
 	"runtime"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -27,28 +28,60 @@ const clipboardSupported = true
 func readClipboard() (string, error) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	if r, _, _ := procOpenClipboard.Call(0); r == 0 {
-		return "", errors.New("área de transferência ocupada")
+	// Outro programa (ex.: o LibreOffice logo depois do Ctrl+C) pode estar com a área de
+	// transferência aberta: tenta de novo por até meio segundo
+	opened := false
+	for i := 0; i < 25; i++ {
+		if r, _, _ := procOpenClipboard.Call(0); r != 0 {
+			opened = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !opened {
+		return "", errors.New("área de transferência ocupada por outro programa")
 	}
 	defer procCloseClipboard.Call()
-	h, _, _ := procGetClipboardData.Call(13) // CF_UNICODETEXT
-	if h == 0 {
-		return "", nil // sem texto
+	if h, _, _ := procGetClipboardData.Call(13); h != 0 { // CF_UNICODETEXT
+		if b := globalBytes(h); b != nil {
+			u := make([]uint16, len(b)/2)
+			for i := range u {
+				u[i] = uint16(b[2*i]) | uint16(b[2*i+1])<<8
+			}
+			return syscall.UTF16ToString(u), nil
+		}
 	}
+	if h, _, _ := procGetClipboardData.Call(1); h != 0 { // CF_TEXT (programas antigos)
+		if b := globalBytes(h); b != nil {
+			r := make([]rune, 0, len(b))
+			for _, c := range b {
+				if c == 0 {
+					break
+				}
+				r = append(r, rune(c))
+			}
+			return string(r), nil
+		}
+	}
+	return "", nil // sem texto
+}
+
+// Copia (no máximo 8 KB) o conteúdo de um bloco de memória global do Windows
+func globalBytes(h uintptr) []byte {
 	p, _, _ := procGlobalLock.Call(h)
 	if p == 0 {
-		return "", errors.New("não foi possível ler a área de transferência")
+		return nil
 	}
 	defer procGlobalUnlock.Call(h)
 	size, _, _ := procGlobalSize.Call(h)
-	n := int(size / 2)
-	if n > 4096 {
-		n = 4096 // só interessa texto curto
+	n := int(size)
+	if n > 8192 {
+		n = 8192 // só interessa texto curto
 	}
-	if n == 0 {
-		return "", nil
+	if n <= 0 {
+		return []byte{}
 	}
-	buf := make([]uint16, n)
-	procMoveMemory.Call(uintptr(unsafe.Pointer(&buf[0])), p, uintptr(n*2))
-	return syscall.UTF16ToString(buf), nil
+	buf := make([]byte, n)
+	procMoveMemory.Call(uintptr(unsafe.Pointer(&buf[0])), p, uintptr(n))
+	return buf
 }

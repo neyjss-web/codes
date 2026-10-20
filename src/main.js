@@ -2434,32 +2434,59 @@ function syncNumInputs(term) {
 // caracteres e começar por dígitos (ex.: o ID de um documento no PJe), a caixa mostra
 // "Num. <texto>". Enter (em qualquer lugar da tela) ou o botão Buscar iniciam a busca.
 let clipBusy = false, clipLast = 0;
+// { text, via, error }: o que foi lido e de onde (o programa ou o navegador)
 async function readClipText() {
+  let err = '';
   // No YayNotes.exe, o próprio programa lê a área de transferência do Windows (sem pedir permissão ao Edge)
   if (IN_LAUNCHER) {
     try {
       const r = await fetch('/clipboard?' + launcherQS(), { cache: 'no-store' });
-      if (r.ok) return await r.text();
-      if (r.status !== 501) return null;
-    } catch { return null; }
+      if (r.ok) {
+        const text = await r.text();
+        if (text.trim()) return { text, via: 'programa' };
+      } else if (r.status !== 501) err = (await r.text()) || `HTTP ${r.status}`;
+    } catch (e) { err = e.message; }
   }
-  if (!navigator.clipboard?.readText || !document.hasFocus()) return null;
-  const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
-  if (st?.state === 'denied') return null;
-  return navigator.clipboard.readText().catch(() => null);
+  // reserva: leitura pelo navegador (pede permissão uma vez)
+  try {
+    if (!navigator.clipboard?.readText) return { text: '', via: 'navegador', error: err || 'navegador sem acesso à área de transferência' };
+    if (!document.hasFocus()) return { text: '', via: 'navegador', error: err || 'janela sem foco' };
+    const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
+    if (st?.state === 'denied') return { text: '', via: 'navegador', error: err || 'permissão negada no Edge' };
+    return { text: await navigator.clipboard.readText(), via: 'navegador', error: err };
+  } catch (e) {
+    return { text: '', via: 'navegador', error: err || e.message };
+  }
 }
-async function fillNumFromClipboard() {
+// Limpa o texto copiado: tira caracteres invisíveis (comuns ao copiar de editores de texto,
+// como o LibreOffice e o Word), quebras de linha e espaços nas pontas
+const cleanClip = (t) => String(t || '').replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ')
+  .replace(/\s+/g, ' ').trim();
+const numFromClip = (t) => (t && t.length <= 15 && /^\d/.test(t) ? `Num. ${t}` : null);
+async function fillNumFromClipboard(explain = false) {
   if (clipBusy) return;
   clipBusy = true;
   clipLast = performance.now();
   try {
-    const t = (await readClipText())?.trim();
-    if (!t || t.length > 15 || !/^\d/.test(t)) return;
-    for (const id of ['#num-search', '#ed-num-search']) {
-      const el = $(id);
-      if (document.activeElement !== el) el.value = `Num. ${t}`;
+    const r = await readClipText();
+    const t = cleanClip(r.text);
+    const v = numFromClip(t);
+    if (v) {
+      for (const id of ['#num-search', '#ed-num-search']) {
+        const el = $(id);
+        if (explain || document.activeElement !== el) el.value = v;
+      }
+    } else if (explain) {
+      // clique na caixa vazia: explica por que nada apareceu
+      const why = !t ? (r.error ? `não foi possível ler (${r.error})` : 'está vazia ou não tem texto')
+        : t.length > 15 ? `tem ${t.length} caracteres (o máximo é 15): “${truncate(t, 40)}”`
+          : `não começa por número: “${t}”`;
+      toast(`Área de transferência ${why}.`, true, 6000);
     }
-  } catch { /* sem permissão ou área de transferência vazia */ } finally { clipBusy = false; }
+  } finally { clipBusy = false; }
+}
+for (const id of ['#num-search', '#ed-num-search']) {
+  $(id).addEventListener('focus', (e) => { if (!e.target.value.trim()) fillNumFromClipboard(true); });
 }
 window.addEventListener('focus', () => setTimeout(fillNumFromClipboard, 50));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fillNumFromClipboard, 50); });
