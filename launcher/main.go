@@ -23,14 +23,71 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 //go:embed YayNotes.html
 var appHTML []byte
 
-var lastPing atomic.Int64
+// Janelas abertas (id -> último sinal de vida). Quando a última fecha, o programa encerra em
+// poucos segundos, liberando o YayNotes.exe (antes ele esperava até 3 minutos).
+var (
+	winMu      sync.Mutex
+	windows    = map[string]time.Time{}
+	closedWins = map[string]bool{} // janelas que já avisaram que fecharam (sinal atrasado não as reabre)
+	lastChange = time.Now()
+	graceUntil = time.Now().Add(90 * time.Second) // tempo para a janela abrir e dar o primeiro sinal
+)
+
+// YAYNOTES_DEBUG=1: mostra no terminal as janelas que abrem e fecham
+var debugLog = os.Getenv("YAYNOTES_DEBUG") != ""
+
+func windowAlive(id string) {
+	if debugLog {
+		fmt.Fprintln(os.Stderr, "ping", id)
+	}
+	winMu.Lock()
+	defer winMu.Unlock()
+	if id == "" {
+		id = "?"
+	}
+	if closedWins[id] {
+		return
+	}
+	if _, ok := windows[id]; !ok {
+		lastChange = time.Now()
+	}
+	windows[id] = time.Now()
+	graceUntil = time.Time{}
+}
+
+func windowClosed(id string) {
+	if debugLog {
+		fmt.Fprintln(os.Stderr, "bye", id)
+	}
+	winMu.Lock()
+	defer winMu.Unlock()
+	delete(windows, id)
+	if id != "" {
+		closedWins[id] = true
+	}
+	lastChange = time.Now()
+}
+
+// true quando não há janela aberta há alguns segundos (tempo para recarregar a página sem encerrar)
+func shouldExit() bool {
+	winMu.Lock()
+	defer winMu.Unlock()
+	now := time.Now()
+	for id, t := range windows {
+		// janela que parou de dar sinal (fechada sem aviso): o app avisa a cada 20 s, ou 1 min se minimizada
+		if now.Sub(t) > 150*time.Second {
+			delete(windows, id)
+			lastChange = now
+		}
+	}
+	return len(windows) == 0 && now.After(graceUntil) && now.Sub(lastChange) > 5*time.Second
+}
 
 // Arquivos abertos pelas janelas (cada janela recebe um número, passado no endereço como f=)
 var (
@@ -171,7 +228,9 @@ func main() {
 		if wid := r.URL.Query().Get("w"); wid != "" && len(wid) <= 64 && strings.Trim(wid, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") == "" {
 			u += "&w=" + wid
 		}
-		lastPing.Store(time.Now().Unix())
+		winMu.Lock()
+		graceUntil = time.Now().Add(90 * time.Second) // a nova janela ainda vai abrir
+		winMu.Unlock()
 		openWindow(u)
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -226,7 +285,16 @@ func main() {
 	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		lastPing.Store(time.Now().Unix())
+		windowAlive(r.URL.Query().Get("w"))
+		w.WriteHeader(http.StatusNoContent)
+	})
+	// Aviso da página ao fechar a janela
+	mux.HandleFunc("/bye", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("t") != token {
+			http.Error(w, "não permitido", http.StatusForbidden)
+			return
+		}
+		windowClosed(r.URL.Query().Get("w"))
 		w.WriteHeader(http.StatusNoContent)
 	})
 	go http.Serve(ln, mux)
@@ -236,24 +304,11 @@ func main() {
 
 	appURL := windowURL(register(initialPath))
 	fmt.Println(appURL)
-	lastPing.Store(time.Now().Unix())
 
-	if cmd := startAppWindow(appURL); cmd != nil {
-		// Janela dedicada (perfil próprio): encerra quando ela for fechada
-		cmd.Wait()
-		// Se o navegador repassou a janela para uma instância já aberta, continua pelos pings
-		if time.Since(time.Unix(lastPing.Load(), 0)) > 30*time.Second {
-			return
-		}
-	} else {
-		openDefaultBrowser(appURL)
-	}
-	// Mantém o servidor enquanto alguma janela enviar sinais de vida
-	for {
-		time.Sleep(15 * time.Second)
-		if time.Since(time.Unix(lastPing.Load(), 0)) > 3*time.Minute {
-			return
-		}
+	openWindow(appURL)
+	// Mantém o servidor enquanto houver janela aberta; encerra logo depois que a última fecha
+	for !shouldExit() {
+		time.Sleep(time.Second)
 	}
 }
 

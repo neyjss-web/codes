@@ -3162,7 +3162,10 @@ setDirty(false);
 (async function launcherIntegration() {
   const token = new URLSearchParams(location.search).get('t');
   if (!/^https?:$/.test(location.protocol) || !token) return;
-  const ping = () => fetch('/ping', { method: 'POST', keepalive: true }).catch(() => {});
+  const winId = uid('j').replace(/[^A-Za-z0-9]/g, '');
+  const ping = () => fetch('/ping?w=' + winId, { method: 'POST', keepalive: true }).catch(() => {});
+  // ao fechar a janela, avisa o programa (ele encerra logo se não houver outra janela aberta)
+  window.addEventListener('pagehide', () => { navigator.sendBeacon?.(`/bye?${launcherQS()}&w=${winId}`); });
   ping();
   setInterval(ping, 20000);
   document.addEventListener('visibilitychange', ping);

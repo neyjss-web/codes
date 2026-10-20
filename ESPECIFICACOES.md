@@ -115,6 +115,9 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 
 ## 6. Limites conhecidos
 
+- **Apagar ou substituir o `YayNotes.exe`**: o programa encerra cerca de 5 segundos depois que a última janela
+  fecha; antes disso, o Windows informa que o arquivo está em uso. Se uma janela for encerrada à força (sem
+  fechar normalmente), o programa espera até 2 minutos e meio.
 - **Aviso do Windows na primeira execução**: o `.exe` não tem assinatura digital, porque o certificado é pago. Basta
   clicar em *Mais informações → Executar assim mesmo*.
 - **Vínculo ao "Num."**: só funciona em páginas que têm o rodapé "Num. … - Pág. …" como texto, o padrão do PJe.
