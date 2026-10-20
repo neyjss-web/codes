@@ -2430,7 +2430,7 @@ function syncNumInputs(term) {
 }
 
 // ---- Caixa do Num.: preenchida com o número copiado (área de transferência) ----
-// Toda vez que a janela do YayNotes recebe o foco (ou é clicada), se o texto copiado tiver até 15
+// Toda vez que a janela do YayNotes recebe o foco (ou é clicada), se o texto copiado tiver até 100
 // caracteres e começar por dígitos (ex.: o ID de um documento no PJe), a caixa mostra
 // "Num. <texto>". Enter (em qualquer lugar da tela) ou o botão Buscar iniciam a busca.
 let clipBusy = false, clipLast = 0;
@@ -2462,7 +2462,9 @@ async function readClipText() {
 // como o LibreOffice e o Word), quebras de linha e espaços nas pontas
 const cleanClip = (t) => String(t || '').replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ')
   .replace(/\s+/g, ' ').trim();
-const numFromClip = (t) => (t && t.length <= 15 && /^\d/.test(t) ? `Num. ${t}` : null);
+// até 100 caracteres: evita colar por acidente um texto enorme na caixa
+const NUM_CLIP_MAX = 100;
+const numFromClip = (t) => (t && t.length <= NUM_CLIP_MAX && /^\d/.test(t) ? `Num. ${t}` : null);
 async function fillNumFromClipboard(explain = false) {
   if (clipBusy) return;
   clipBusy = true;
@@ -2479,7 +2481,7 @@ async function fillNumFromClipboard(explain = false) {
     } else if (explain) {
       // clique na caixa vazia: explica por que nada apareceu
       const why = !t ? (r.error ? `não foi possível ler (${r.error})` : 'está vazia ou não tem texto')
-        : t.length > 15 ? `tem ${t.length} caracteres (o máximo é 15): “${truncate(t, 40)}”`
+        : t.length > NUM_CLIP_MAX ? `tem ${t.length} caracteres (o máximo é ${NUM_CLIP_MAX}): “${truncate(t, 40)}”`
           : `não começa por número: “${t}”`;
       toast(`Área de transferência ${why}.`, true, 6000);
     }
