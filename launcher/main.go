@@ -205,6 +205,25 @@ func main() {
 		w.Header().Set("X-File-Id", register(path))
 		w.Write(data)
 	})
+	// Texto da área de transferência (caixa "Num." do app)
+	mux.HandleFunc("/clipboard", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("t") != token {
+			http.Error(w, "não permitido", http.StatusForbidden)
+			return
+		}
+		if !clipboardSupported {
+			http.Error(w, "indisponível", http.StatusNotImplemented)
+			return
+		}
+		text, err := readClipboard()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		io.WriteString(w, text)
+	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		lastPing.Store(time.Now().Unix())

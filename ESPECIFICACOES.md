@@ -72,7 +72,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Pedido | Como ficou |
 |---|---|
 | Passar para a próxima ocorrência | Mostra "3 de 12 · p. 875". Use ▲ ▼, `Enter` e `Shift+Enter`, ou `F3` e `Shift+F3`. Na visão de página, a palavra encontrada fica destacada em laranja. |
-| Buscar o "Num." copiado | Ao lado da busca há uma caixa **Num. …**. Ao copiar um texto curto (menos de 15 caracteres) que começa por números, como o ID de um documento no PJe, ela mostra "Num. 2136402905". `Enter` busca, e `Enter` de novo vai para a próxima ocorrência. A caixa de busca normal não muda. Na primeira vez, o Edge pergunta se o app pode ler a área de transferência. |
+| Buscar o "Num." copiado | Ao lado da busca há uma caixa **Num. …** com o botão **🔍 Buscar**. Toda vez que você volta para a janela do YayNotes (ou clica nela), se o texto copiado tiver até 15 caracteres e começar por números, como o ID de um documento no PJe, a caixa mostra "Num. 2136402905". `Enter` (em qualquer ponto da tela, fora de outros campos) ou **Buscar** iniciam a busca; de novo, vão para a próxima ocorrência. A caixa de busca normal não muda. No `YayNotes.exe`, quem lê a área de transferência é o próprio programa, sem pedir permissão ao Edge. |
 | Continuar a busca a partir de onde estou | Nas miniaturas, ao clicar numa página, a próxima ocorrência (ou a anterior) é procurada a partir dela. Na visão de página, a partir da página atual. Uma busca nova também começa nesse ponto. |
 
 ## 3. Comentários

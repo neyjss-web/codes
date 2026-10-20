@@ -80,7 +80,7 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 .btn.on { background: var(--accent-soft); border-color: var(--accent); }
 .search input { width: 180px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); min-height: 30px; }
 #search-info { color: var(--muted); font-size: 12px; }
-.num-search input.num-box { width: 150px; }
+.num-search input.num-box, .ed-search input.num-box { width: 170px; }
 .num-info { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
 .author { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }

@@ -292,7 +292,7 @@ async function openPdf(file, target = null) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num', '#search', '#num-search']) $(b).disabled = false;
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num', '#search', '#num-search', '#num-go']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
@@ -2430,19 +2430,31 @@ function syncNumInputs(term) {
 }
 
 // ---- Caixa do Num.: preenchida com o número copiado (área de transferência) ----
-// Se o texto copiado tiver menos de 15 caracteres e começar por dígitos (ex.: o ID de um documento
-// no PJe), a caixa mostra "Num. <texto>", pronta para buscar com Enter.
-let lastClip = null, clipBusy = false;
+// Toda vez que a janela do YayNotes recebe o foco (ou é clicada), se o texto copiado tiver até 15
+// caracteres e começar por dígitos (ex.: o ID de um documento no PJe), a caixa mostra
+// "Num. <texto>". Enter (em qualquer lugar da tela) ou o botão Buscar iniciam a busca.
+let clipBusy = false, clipLast = 0;
+async function readClipText() {
+  // No YayNotes.exe, o próprio programa lê a área de transferência do Windows (sem pedir permissão ao Edge)
+  if (IN_LAUNCHER) {
+    try {
+      const r = await fetch('/clipboard?' + launcherQS(), { cache: 'no-store' });
+      if (r.ok) return await r.text();
+      if (r.status !== 501) return null;
+    } catch { return null; }
+  }
+  if (!navigator.clipboard?.readText || !document.hasFocus()) return null;
+  const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
+  if (st?.state === 'denied') return null;
+  return navigator.clipboard.readText().catch(() => null);
+}
 async function fillNumFromClipboard() {
-  if (clipBusy || !document.hasFocus() || !navigator.clipboard?.readText) return;
+  if (clipBusy) return;
   clipBusy = true;
+  clipLast = performance.now();
   try {
-    const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
-    if (st?.state === 'denied') return;
-    const t = (await navigator.clipboard.readText()).trim();
-    if (t === lastClip) return;
-    lastClip = t;
-    if (t.length >= 15 || !/^\d/.test(t)) return;
+    const t = (await readClipText())?.trim();
+    if (!t || t.length > 15 || !/^\d/.test(t)) return;
     for (const id of ['#num-search', '#ed-num-search']) {
       const el = $(id);
       if (document.activeElement !== el) el.value = `Num. ${t}`;
@@ -2451,7 +2463,26 @@ async function fillNumFromClipboard() {
 }
 window.addEventListener('focus', () => setTimeout(fillNumFromClipboard, 50));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fillNumFromClipboard, 50); });
+// clique na janela (já em foco): confere de novo, no máximo uma vez por segundo
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest?.('.num-box') || performance.now() - clipLast < 1000) return;
+  fillNumFromClipboard();
+}, true);
 setTimeout(fillNumFromClipboard, 800);
+
+// Busca pela caixa do Num.: a primeira vez busca; de novo, vai para a próxima ocorrência
+function runNumSearch(d = 1) {
+  if (!S.pdf) return;
+  const term = $(E.open ? '#ed-num-search' : '#num-search').value.trim();
+  if (!term) return;
+  if (term === S.searchTerm && S.searchSrc === 'num' && S.occ?.length) stepOcc(d);
+  else runSearch(term, 'num');
+}
+for (const id of ['#num-go', '#ed-num-go']) $(id).onclick = (e) => runNumSearch(e.shiftKey ? -1 : 1);
+// as duas caixas (miniaturas e leitura) mostram o mesmo texto
+for (const [a, b] of [['#num-search', '#ed-num-search'], ['#ed-num-search', '#num-search']]) {
+  $(a).addEventListener('input', () => { $(b).value = $(a).value; });
+}
 
 // Página de onde a busca deve continuar: a clicada nas miniaturas ou, na leitura, a página atual
 // (quando o usuário saiu da página da última ocorrência). null = continuar da última ocorrência.
@@ -2764,6 +2795,7 @@ async function closePdf() {
   $('#search').value = '';
   $('#search').disabled = true;
   $('#num-search').disabled = true;
+  $('#num-go').disabled = true;
   updateSearchUI('');
   renderSide();
   renderOutlines();
@@ -3045,6 +3077,11 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (typing) return;
+  // Enter fora dos campos: busca o que está na caixa do Num. (de novo: próxima ocorrência)
+  if (e.key === 'Enter' && !mod && !e.altKey && S.pdf && !tgt.closest?.('button, a, summary, dialog, .tool')) {
+    const box = $(E.open ? '#ed-num-search' : '#num-search');
+    if (box.value.trim()) { e.preventDefault(); runNumSearch(e.shiftKey ? -1 : 1); return; }
+  }
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? restore(S.redo, S.undo) : restore(S.undo, S.redo); return; }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); restore(S.redo, S.undo); return; }
   if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); const f = $(E.open ? '#ed-search' : '#search'); f.focus(); f.select(); return; }
