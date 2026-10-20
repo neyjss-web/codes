@@ -72,7 +72,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Pedido | Como ficou |
 |---|---|
 | Passar para a próxima ocorrência | Mostra "3 de 12 · p. 875". Use ▲ ▼, `Enter` e `Shift+Enter`, ou `F3` e `Shift+F3`. Na visão de página, a palavra encontrada fica destacada em laranja. |
-| Buscar o "Num." copiado | Ao lado da busca há uma caixa **Num. …** com o botão **🔍 Buscar**. Toda vez que você volta para a janela do YayNotes (ou clica nela), se o texto copiado tiver até 100 caracteres (limite só para evitar colar um texto enorme por acidente) e começar por números, a caixa mostra "Num. " seguido dele: por exemplo, "Num. 2136402905" ou "Num. 731259067 - Pág. 70", que leva direto à página do documento. `Enter` (em qualquer ponto da tela, fora de outros campos) ou **Buscar** iniciam a busca; de novo, vão para a próxima ocorrência. A caixa de busca normal não muda. No `YayNotes.exe`, quem lê a área de transferência é o próprio programa, sem pedir permissão ao Edge (com reserva pelo navegador). Caracteres invisíveis que editores como o LibreOffice e o Word acrescentam ao copiar são descartados. Se nada aparecer, clique na caixa vazia: o app explica o que leu e por que não usou. |
+| Buscar o "Num." copiado | Ao lado da busca há uma caixa **Num. …** com o botão **🔍 Buscar**. Toda vez que você volta para a janela do YayNotes (ou clica nela), se o texto copiado tiver até 100 caracteres (limite só para evitar colar um texto enorme por acidente) e começar por números, a caixa mostra "Num. " seguido dele: por exemplo, "Num. 2136402905" ou "Num. 731259067 - Pág. 70", que leva direto à página do documento. **`F4`** (em qualquer ponto da tela, até dentro de outros campos; lê de novo a área de transferência), `Enter` (fora de outros campos) ou **Buscar** iniciam a busca; de novo, vão para a próxima ocorrência (`Shift+F4`: anterior). A caixa de busca normal não muda. No `YayNotes.exe`, quem lê a área de transferência é o próprio programa, sem pedir permissão ao Edge (com reserva pelo navegador). Caracteres invisíveis que editores como o LibreOffice e o Word acrescentam ao copiar são descartados. Se nada aparecer, clique na caixa vazia: o app explica o que leu e por que não usou. |
 | Continuar a busca a partir de onde estou | Nas miniaturas, ao clicar numa página, a próxima ocorrência (ou a anterior) é procurada a partir dela. Na visão de página, a partir da página atual. Uma busca nova também começa nesse ponto. |
 
 ## 3. Comentários
@@ -81,6 +81,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 |---|---|
 | Tipos de comentário | Nota, texto livre, realce, sublinhado, tachado, retângulo, elipse e desenho livre. |
 | Ver o conteúdo ao passar o mouse | Pop-up com o texto, o autor, a data e a página. |
+| Fechar a caixa de edição ao clicar na página | Um clique em qualquer ponto da página fora de um comentário (inclusive sobre o texto ou na área cinza) fecha a caixa de edição. O texto digitado já fica salvo no comentário. |
 | Clique duplo no ícone abre a edição | O cursor vai para o **fim** do texto do comentário, sem selecionar nada. |
 | Copiar texto sem formatação | Copiar (`Ctrl+C`, `Ctrl+X` ou o menu de contexto) leva só o texto puro, **numa linha só**: sem fontes, cores ou estilos, sem quebras de linha e sem espaços duplos. Vale para o texto do PDF e o dos comentários. Colar num comentário também junta o texto numa linha. |
 | Formatação | Só **negrito** (`Ctrl+B`) e **vermelho** (botão **A** ou `Ctrl+Shift+X`). Itálico, sublinhado, outras fontes e cores são bloqueados, e texto colado entra sem formatação. A fonte é sempre a mesma. |
@@ -138,6 +139,7 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | `0` | Página inteira |
 | `Ctrl + "+"` / `Ctrl + "-"` | Girar a visualização 90° à direita / à esquerda |
 | `Ctrl+F`, `F3` / `Shift+F3` | Buscar; próxima / anterior ocorrência |
+| `F4` / `Shift+F4` | Buscar o "Num." copiado; próxima / anterior ocorrência |
 | `Ctrl+A` / `Esc` | Selecionar todas as páginas / limpar a seleção |
 | `M` | Marcar as páginas selecionadas com um comentário |
 | `L` | Liga/desliga a lupa |

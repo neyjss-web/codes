@@ -1856,11 +1856,14 @@ epages.addEventListener('pointerdown', (e) => {
     E.drag = { kind: 'markup', i, el: pel, p0, p1: p0 };
     return;
   }
-  if (E.tool === 'select' && !e.target.closest('.textLayer span') && E.selId) {
-    // clique no vazio: desmarca
-    E.selId = null;
-    renderEditorOverlay();
-  }
+});
+
+// Clique na página (fora de um comentário), inclusive sobre o texto ou na área cinza: fecha a
+// caixa de edição do comentário. O que foi digitado já está salvo no comentário.
+escroll.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !E.selId || e.target.closest('.hit, .handle, .draw')) return;
+  E.selId = null;
+  renderEditorOverlay();
 });
 
 // ---- Pop-up com o conteúdo do comentário ao pairar o cursor ----
@@ -3103,6 +3106,12 @@ document.addEventListener('keydown', (e) => {
     if (!pv.el.hidden) { hidePreview(); return; }
     if (E.open) { if (E.selId) { E.selId = null; renderEditorOverlay(); } else closeEditor(); return; }
     if (S.sel.size) selectPages([]);
+    return;
+  }
+  // F4: busca o Num. copiado (lê de novo a área de transferência); de novo, próxima ocorrência
+  if (e.key === 'F4' && !mod && !e.altKey) {
+    e.preventDefault();
+    if (S.pdf) fillNumFromClipboard().then(() => runNumSearch(e.shiftKey ? -1 : 1));
     return;
   }
   if (typing) return;
