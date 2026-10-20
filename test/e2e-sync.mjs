@@ -22,6 +22,8 @@ async function openWin() {
 const count = (p) => p.evaluate(() => window.__yaynotes.S.annots.length);
 const has = (p, txt) => p.evaluate((t) => window.__yaynotes.S.annots.some((a) => a.contents === t), txt);
 const dirty = (p) => p.evaluate(() => window.__yaynotes.S.dirty);
+const dirtyFdf = (p) => p.evaluate(() => window.__yaynotes.S.dirtyFdf);
+const dirtyPdf = (p) => p.evaluate(() => window.__yaynotes.S.dirtyPdf);
 
 const A = await openWin();
 const B = await openWin();
@@ -58,7 +60,8 @@ const dl = A.waitForEvent('download');
 await A.evaluate(() => window.__yaynotes.exportFdfFile());
 await dl;
 await B.waitForTimeout(500);
-if ((await dirty(A)) || (await dirty(B))) fail(`após salvar em A: A sujo=${await dirty(A)}, B sujo=${await dirty(B)}`);
+if ((await dirtyFdf(A)) || (await dirtyFdf(B))) fail(`após salvar o FDF em A: FDF ainda marcado (A=${await dirtyFdf(A)}, B=${await dirtyFdf(B)})`);
+if (!(await dirtyPdf(A)) || !(await dirtyPdf(B))) fail('salvar o FDF não pode desmarcar o PDF (são arquivos separados)');
 
 // botão "Nova janela": abre o mesmo documento, na mesma página, já sincronizado
 await A.evaluate(() => window.__yaynotes.newAnnot({ type: 'Text', page: 7, rect: [100, 100, 120, 120], contents: 'antes da nova janela' }));

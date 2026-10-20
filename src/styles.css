@@ -13,9 +13,9 @@
   --match: #f59e0b;
   --shadow: 0 1px 3px rgb(16 24 40 / 0.18);
   --pw: 200px;
-  --warn: #d97706;
-  --warn-bg: #fef3c7;
-  --warn-text: #7c2d12;
+  --warn: #ef4444;
+  --warn-bg: #fee2e2;
+  --warn-text: #991b1b;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -31,14 +31,14 @@
     --danger: #ff6b6b;
     --sel: #6e9bff;
     --shadow: 0 1px 3px rgb(0 0 0 / 0.5);
-    --warn: #f59e0b; --warn-bg: rgb(245 158 11 / 0.18); --warn-text: #fcd34d;
+    --warn: #f87171; --warn-bg: rgb(239 68 68 / 0.2); --warn-text: #fecaca;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #15181e; --panel: #1f232b; --panel-2: #262b35; --text: #e6e9ef; --muted: #9aa3b2; --border: #363c48;
   --accent: #6e9bff; --accent-soft: rgb(110 155 255 / 0.16); --danger: #ff6b6b; --sel: #6e9bff; color-scheme: dark;
-  --warn: #f59e0b; --warn-bg: rgb(245 158 11 / 0.18); --warn-text: #fcd34d;
+  --warn: #f87171; --warn-bg: rgb(239 68 68 / 0.2); --warn-text: #fecaca;
 }
 
 * { box-sizing: border-box; }
@@ -71,6 +71,7 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 /* Salvar PDF / Salvar FDF com alterações ainda não salvas */
 .btn.unsaved { background: var(--warn-bg); border-color: var(--warn); color: var(--warn-text); font-weight: 600; }
 .btn.unsaved::before { content: "●"; font-size: 9px; color: var(--warn); }
+.btn.saving:disabled { opacity: 0.85; cursor: progress; }
 .btn.danger { color: var(--danger); }
 .btn.icon { min-width: 30px; justify-content: center; padding: 4px 6px; font-weight: 600; }
 .zoom #zoom-label { min-width: 70px; text-align: center; color: var(--muted); font-size: 12px; }
@@ -79,6 +80,8 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 .btn.on { background: var(--accent-soft); border-color: var(--accent); }
 .search input { width: 180px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); min-height: 30px; }
 #search-info { color: var(--muted); font-size: 12px; }
+.num-search input.num-box { width: 150px; }
+.num-info { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
 .author { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .author input { width: 110px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }

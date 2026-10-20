@@ -187,16 +187,22 @@ const textOn = (c) => {
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function setDirty(v = true) {
-  S.dirty = v;
+// Alterações não salvas, separadas por arquivo: o PDF e o FDF são gravados de forma independente.
+// which: 'pdf', 'fdf' ou 'both'
+function setDirty(v = true, which = 'both') {
+  if (which !== 'fdf') S.dirtyPdf = v;
+  if (which !== 'pdf') S.dirtyFdf = v;
+  S.dirty = !!(S.dirtyPdf || S.dirtyFdf);
   if (v) syncSoon();
-  document.title = (v ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'YayNotes';
-  // Destaca os botões de salvar (PDF e FDF) quando há alterações não salvas
-  for (const id of ['#save-pdf', '#export-fdf', '#ed-save', '#ed-fdf']) {
-    const b = $(id);
-    if (!b) continue;
-    b.classList.toggle('unsaved', v);
-    b.title = b.title.replace(/ — há alterações não salvas$/, '') + (v ? ' — há alterações não salvas' : '');
+  document.title = (S.dirty ? '• ' : '') + (S.fileName ? `${S.fileName} — ` : '') + 'YayNotes';
+  // Destaca cada botão de salvar enquanto o seu arquivo tiver alterações não salvas
+  for (const [ids, on] of [[['#save-pdf', '#ed-save'], S.dirtyPdf], [['#export-fdf', '#ed-fdf'], S.dirtyFdf]]) {
+    for (const id of ids) {
+      const b = $(id);
+      if (!b) continue;
+      b.classList.toggle('unsaved', !!on);
+      b.title = b.title.replace(/ — há alterações não salvas$/, '') + (on ? ' — há alterações não salvas' : '');
+    }
   }
 }
 
@@ -222,6 +228,7 @@ function restore(from, to) {
 // ============================================================================
 
 async function openPdf(file, target = null) {
+  if (S.saving) { toast('Aguarde: o PDF atual ainda está sendo salvo.', true); return; }
   if (S.dirty) {
     const r = await choose('Há comentários não salvos. Abrir outro PDF mesmo assim?', [
       { label: 'Cancelar', value: 'no' }, { label: 'Abrir e descartar', value: 'yes', primary: true },
@@ -238,14 +245,12 @@ async function openPdf(file, target = null) {
     progress(0.15, 'Lendo comentários existentes…');
     await nextPaint();
     try {
-      const doc = await loadPdfLib(buf.slice());
-      annots = readAnnotations(doc);
-      trailerId = getTrailerId(doc);
-      if (annots.length) {
-        // Remove os comentários da cópia exibida: eles passam a ser desenhados (e editados) pelo app.
-        stripAnnotations(doc);
-        displayBytes = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
-      }
+      // Em segundo plano (sem travar a tela): comentários existentes e a cópia exibida sem eles,
+      // já que os comentários passam a ser desenhados (e editados) pelo app.
+      const r = await pdfRead(buf, gen);
+      annots = r.annots;
+      trailerId = r.trailerId;
+      if (r.display) displayBytes = r.display;
     } catch (e) {
       console.warn(e);
       canWrite = false;
@@ -266,15 +271,18 @@ async function openPdf(file, target = null) {
     try { S.task?.destroy(); } catch { /* ignora */ }
     Object.assign(S, {
       fileName: file.name, target, fdfHandle: null, bytes: buf, pdf, task, n: pdf.numPages, vps: [], annots: [], groups: [],
-      sel: new Set(), lastClicked: null, searchFrom: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '',
+      docId: gen, sel: new Set(), lastClicked: null, searchFrom: null, canWrite, trailerId, text: new Map(), links: new Map(), anchors: new Map(), matches: new Set(), occ: [], occIdx: -1, outline: [], olFlat: [], rot: 0, searchTerm: '',
       undo: [], redo: [],
     });
     if (!S.trailerId && pdf.fingerprints?.[0]) S.trailerId = [pdf.fingerprints[0].toUpperCase(), (pdf.fingerprints[1] || pdf.fingerprints[0]).toUpperCase()];
-    for (let i = 1; i <= S.n; i++) {
-      const page = await pdf.getPage(i);
+    // tamanhos das páginas, pedidos em lotes (bem mais rápido em processos com milhares de páginas)
+    for (let i = 1; i <= S.n; i += 32) {
+      const batch = [];
+      for (let k = i; k < i + 32 && k <= S.n; k++) batch.push(pdf.getPage(k));
+      for (const page of await Promise.all(batch)) S.vps.push(page.getViewport({ scale: 1, rotation: rotOf(page) }));
       if (gen !== S.gen) return;
-      S.vps.push(page.getViewport({ scale: 1, rotation: rotOf(page) }));
-      if (i % 25 === 0) { progress(0.35 + 0.6 * (i / S.n), `Preparando páginas… ${i}/${S.n}`); await nextPaint(); }
+      progress(0.35 + 0.6 * (S.vps.length / S.n), `Preparando páginas… ${S.vps.length}/${S.n}`);
+      if ((i - 1) % 128 === 0) await nextPaint();
     }
     S.annots = annots.filter((a) => a.page < S.n);
     S.groups = rebuildGroups(S.annots, []);
@@ -284,7 +292,7 @@ async function openPdf(file, target = null) {
     S.zoomIdx = zoomIdxForPerRow(4);
     buildGrid();
     loadOutline();
-    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num', '#search']) $(b).disabled = false;
+    for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num', '#search', '#num-search']) $(b).disabled = false;
     $('#save-pdf').title = canWrite ? 'Gravar os comentários dentro do PDF aberto (Ctrl+S)' : 'Este PDF não permite gravação direta; use Salvar FDF';
     progress(null);
     loadingBox(null);
@@ -1075,6 +1083,8 @@ const epageEl = (i) => epages.children[i];
 function openEditor(i, selId = null) {
   hidePreview();
   E.open = true;
+  E.hist = [i];
+  E.histIdx = 0;
   E.selId = selId;
   $('#editor').hidden = false;
   setTool(E.tool);
@@ -1330,6 +1340,7 @@ function setCurrentPage(i, force = false) {
   if (!force && i === E.i) return;
   const fwd = i >= (E.i ?? 0);
   E.i = i;
+  histSoon(i);
   prefetchAround(i, fwd);
   pumpEPages();
   updateOutlineCurrent(i);
@@ -1340,6 +1351,34 @@ function setCurrentPage(i, force = false) {
   $('#ed-next').disabled = i === S.n - 1;
   for (const h of $$('#ed-list .pg-h.cur')) h.classList.remove('cur');
   $(`#ed-list .pg-h[data-p="${i}"]`)?.classList.add('cur');
+}
+
+// ---- Histórico de páginas visualizadas (Alt+← / Alt+→) ----
+// Entra no histórico a página em que o leitor parou (por pelo menos meio segundo) ou de onde saltou.
+let histTimer = 0;
+function histPush(i) {
+  if (!E.hist || i == null || E.hist[E.histIdx] === i) return;
+  E.hist.length = E.histIdx + 1; // visitar outra página descarta o "avançar"
+  E.hist.push(i);
+  if (E.hist.length > 200) E.hist.shift();
+  E.histIdx = E.hist.length - 1;
+}
+function histSoon(i) {
+  clearTimeout(histTimer);
+  histTimer = setTimeout(() => { if (E.open && E.i === i && E.pendingNav == null) histPush(i); }, 500);
+}
+function histStep(d) {
+  if (!E.hist) return;
+  clearTimeout(histTimer);
+  const cur = navBase();
+  if (E.hist[E.histIdx] !== cur) histPush(cur); // a página atual ainda não tinha entrado
+  const k = E.histIdx + d;
+  if (k < 0 || k >= E.hist.length) {
+    toast(d < 0 ? 'Não há página anterior no histórico.' : 'Não há página seguinte no histórico.', false, 1500);
+    return;
+  }
+  E.histIdx = k;
+  gotoEditorPage(E.hist[k]);
 }
 
 // Adianta o desenho das vizinhas (no sentido da leitura primeiro): ao avançar, a próxima página
@@ -2338,16 +2377,19 @@ function countOcc(hay, t) {
   return n;
 }
 
-async function runSearch(term) {
+// src: 'main' (caixa de busca) ou 'num' (caixa do Num.); a outra caixa não é alterada
+async function runSearch(term, src = 'main') {
   const gen = ++searchGen;
   S.searchTerm = term;
+  S.searchSrc = src;
   S.matches.clear();
   S.occ = [];
   S.occIdx = -1;
   for (let i = 0; i < S.n; i++) pageEl(i).classList.remove('match', 'cur-match');
   if (E.open) for (const tl of $$('.epage .textLayer')) markHits(tl);
   const t = normNoSpace(term);
-  syncSearchInputs(term);
+  if (src === 'main') syncSearchInputs(term);
+  else syncNumInputs(term);
   if (!t) { updateSearchUI(''); updateSelectionUI(); return; }
   const from = searchAnchor() ?? 0;
   S.searchFrom = null;
@@ -2374,13 +2416,42 @@ function updateSearchUI(msg) {
   const n = S.occ?.length || 0;
   const text = msg ?? (!S.searchTerm ? '' : !n ? 'nada encontrado'
     : `${S.occIdx + 1} de ${n} · p. ${S.occ[S.occIdx].page + 1}` + (S.matches.size > 1 ? ` (${S.matches.size} págs.)` : ''));
-  for (const id of ['#search-info', '#ed-search-info']) $(id).textContent = text;
+  const num = S.searchSrc === 'num';
+  for (const id of ['#search-info', '#ed-search-info']) $(id).textContent = num ? '' : text;
+  for (const id of ['#num-search-info', '#ed-num-search-info']) $(id).textContent = num ? text : '';
   for (const id of ['#search-prev', '#search-next', '#ed-search-prev', '#ed-search-next']) $(id).disabled = n < 1;
 }
 
 function syncSearchInputs(term) {
   for (const id of ['#search', '#ed-search']) if ($(id).value.trim() !== term) $(id).value = term;
 }
+function syncNumInputs(term) {
+  for (const id of ['#num-search', '#ed-num-search']) if ($(id).value.trim() !== term) $(id).value = term;
+}
+
+// ---- Caixa do Num.: preenchida com o número copiado (área de transferência) ----
+// Se o texto copiado tiver menos de 15 caracteres e começar por dígitos (ex.: o ID de um documento
+// no PJe), a caixa mostra "Num. <texto>", pronta para buscar com Enter.
+let lastClip = null, clipBusy = false;
+async function fillNumFromClipboard() {
+  if (clipBusy || !document.hasFocus() || !navigator.clipboard?.readText) return;
+  clipBusy = true;
+  try {
+    const st = await navigator.permissions?.query({ name: 'clipboard-read' }).catch(() => null);
+    if (st?.state === 'denied') return;
+    const t = (await navigator.clipboard.readText()).trim();
+    if (t === lastClip) return;
+    lastClip = t;
+    if (t.length >= 15 || !/^\d/.test(t)) return;
+    for (const id of ['#num-search', '#ed-num-search']) {
+      const el = $(id);
+      if (document.activeElement !== el) el.value = `Num. ${t}`;
+    }
+  } catch { /* sem permissão ou área de transferência vazia */ } finally { clipBusy = false; }
+}
+window.addEventListener('focus', () => setTimeout(fillNumFromClipboard, 50));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(fillNumFromClipboard, 50); });
+setTimeout(fillNumFromClipboard, 800);
 
 // Página de onde a busca deve continuar: a clicada nas miniaturas ou, na leitura, a página atual
 // (quando o usuário saiu da página da última ocorrência). null = continuar da última ocorrência.
@@ -2445,16 +2516,17 @@ function focusHitInEditor(o) {
 
 function searchKey(e) {
   const term = e.target.value.trim();
+  const src = e.target.classList.contains('num-box') ? 'num' : 'main';
   if (e.key === 'Enter') {
     e.preventDefault();
-    if (term && term === S.searchTerm && S.occ?.length) stepOcc(e.shiftKey ? -1 : 1);
-    else runSearch(term);
+    if (term && term === S.searchTerm && src === S.searchSrc && S.occ?.length) stepOcc(e.shiftKey ? -1 : 1);
+    else runSearch(term, src);
   }
-  if (e.key === 'Escape') { e.target.value = ''; runSearch(''); (E.open ? escroll : viewer).focus(); }
+  if (e.key === 'Escape') { e.target.value = ''; runSearch('', src); (E.open ? escroll : viewer).focus(); }
 }
-for (const id of ['#search', '#ed-search']) {
+for (const id of ['#search', '#ed-search', '#num-search', '#ed-num-search']) {
   $(id).addEventListener('keydown', searchKey);
-  $(id).addEventListener('search', (e) => { if (!e.target.value) runSearch(''); });
+  $(id).addEventListener('search', (e) => { if (!e.target.value) runSearch('', e.target.classList.contains('num-box') ? 'num' : 'main'); });
 }
 for (const [id, d] of [['#search-prev', -1], ['#search-next', 1], ['#ed-search-prev', -1], ['#ed-search-next', 1]]) {
   $(id).onclick = () => stepOcc(d);
@@ -2535,7 +2607,7 @@ async function reviseAnnotations(list, origem) {
     delete a._anchorNotFound;
   }
   if (!linked && !fmt) return;
-  setDirty(true);
+  setDirty(true, origem === 'do PDF' ? 'pdf' : 'both'); // revisão do que veio do PDF: falta gravar só no PDF
   if (E.open) renderProps();
   const partes = [];
   if (linked) partes.push(`${linked} vinculado(s) ao Num. da página`);
@@ -2599,12 +2671,14 @@ async function pickSaveHandle(suggestedName, types, startIn) {
 }
 
 // Identificação da janela junto ao YayNotes.exe: chave de acesso (t) e arquivo recebido por esta janela (f)
-function launcherQS() {
+// f: arquivo registrado no programa (aberto pela janela Abrir do Windows); sem ele, o da própria janela
+function launcherQS(f = null) {
   const q = new URLSearchParams(location.search);
   const o = new URLSearchParams({ t: q.get('t') || '' });
-  if (q.get('f')) o.set('f', q.get('f'));
+  if (f || q.get('f')) o.set('f', f || q.get('f'));
   return o.toString();
 }
+const IN_LAUNCHER = /^https?:$/.test(location.protocol) && !!new URLSearchParams(location.search).get('t');
 
 async function writeTarget(target, bytes, mime) {
   if (target.kind === 'handle') {
@@ -2612,7 +2686,7 @@ async function writeTarget(target, bytes, mime) {
     await w.write(new Blob([bytes], { type: mime }));
     await w.close();
   } else if (target.kind === 'launcher') {
-    const r = await fetch('/save-initial?' + launcherQS(), { method: 'POST', body: bytes });
+    const r = await fetch('/save-initial?' + launcherQS(target.f), { method: 'POST', body: bytes });
     if (!r.ok) throw new Error((await r.text()) || `HTTP ${r.status}`);
   } else {
     download(bytes, target.name, mime);
@@ -2632,6 +2706,20 @@ async function choosePdfTarget(saveAs) {
 }
 
 async function openPdfDialog() {
+  // Pelo YayNotes.exe: a janela Abrir é a do próprio Windows, e o PDF é gravado depois sem a
+  // confirmação "Salvar alterações?" que o Edge pede para arquivos abertos pela página
+  if (IN_LAUNCHER && FS_API) {
+    try {
+      const r = await fetch('/pick-open?' + launcherQS(), { method: 'POST' });
+      if (r.status === 204) return; // cancelado
+      if (r.ok) {
+        const name = decodeURIComponent(r.headers.get('X-File-Name') || 'documento.pdf');
+        const file = new File([await r.arrayBuffer()], name, { type: 'application/pdf' });
+        openPdf(file, { kind: 'launcher', f: r.headers.get('X-File-Id') });
+        return;
+      }
+    } catch { /* usa a janela do navegador */ }
+  }
   if (!FS_API || typeof window.showOpenFilePicker !== 'function') { $('#open-pdf').click(); return; }
   try {
     const [h] = await window.showOpenFilePicker({ types: PDF_TYPES, multiple: false });
@@ -2642,6 +2730,7 @@ async function openPdfDialog() {
 // Fecha o PDF e volta à tela inicial, mantendo o YayNotes aberto
 async function closePdf() {
   if (!S.pdf) return;
+  if (S.saving) { toast('Aguarde: o PDF está sendo salvo.', true); return; }
   if (S.dirty) {
     const r = await choose(`Há comentários não salvos em “${S.fileName}”. O que fazer antes de fechar?`, [
       { label: 'Cancelar', value: 'cancel' },
@@ -2674,6 +2763,7 @@ async function closePdf() {
   for (const b of ['#save-pdf', '#save-pdf-as', '#export-fdf', '#close-pdf', '#new-window', '#copy-num']) $(b).disabled = true;
   $('#search').value = '';
   $('#search').disabled = true;
+  $('#num-search').disabled = true;
   updateSearchUI('');
   renderSide();
   renderOutlines();
@@ -2685,6 +2775,7 @@ const baseName = () => S.fileName.replace(/\.pdf$/i, '') || 'documento';
 
 async function savePdf(saveAs = false) {
   if (!S.pdf) return false;
+  if (S.saving) { toast('O PDF já está sendo salvo. Aguarde um instante.'); return false; }
   if (!S.canWrite) {
     toast('Este PDF não pode ser regravado pelo aplicativo (protegido ou danificado). Use “Salvar FDF”.', true);
     return false;
@@ -2693,40 +2784,118 @@ async function savePdf(saveAs = false) {
   try { target = await choosePdfTarget(saveAs); } catch (e) { toast('Não foi possível salvar: ' + e.message, true); return false; }
   if (!target) return false; // cancelado
   const name = target.kind === 'handle' ? target.handle.name : target.kind === 'launcher' ? S.fileName : target.name;
-  loadingBox({ name }, 'Salvando arquivo PDF…');
+  // Gravação em segundo plano: a tela continua livre para ler e comentar enquanto o PDF é gerado.
+  // O que for alterado durante a gravação continua marcado como não salvo.
+  const gen = S.gen;
+  S.saving = true;
+  savingUI(true);
   try {
-    progress(0.1, 'Lendo o documento original…');
-    await nextPaint();
     await stampAnchors(S.annots);
+    progress(null);
     const sig = stateSig();
-    const doc = await loadPdfLib(S.bytes.slice());
-    progress(0.4, `Gravando ${S.annots.length} comentário(s)…`);
-    await nextPaint();
-    stripAnnotations(doc);
-    await writeAnnotations(doc, S.annots);
-    progress(0.65, 'Gerando o arquivo PDF…');
-    await nextPaint();
-    const out = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
-    progress(0.85, `Gravando o arquivo (${fmtSize(out.length)})…`);
-    await nextPaint();
-    await writeTarget(target, out, 'application/pdf');
-    progress(1, 'Concluído');
-    await nextPaint();
-    // o arquivo gravado passa a ser o arquivo de trabalho
-    S.bytes = out;
+    const n = S.annots.length;
+    const res = await pdfSave(target, S.annots);
+    if (gen !== S.gen) return false;
+    if (!res.written) {
+      await writeTarget(target, res.out, 'application/pdf');
+      S.bytes = res.out; // o arquivo gravado passa a ser o arquivo de trabalho
+    }
     if (target.kind !== 'download') { S.target = target; S.fileName = name; }
-    syncSaved(sig);
+    syncSaved(sig, 'pdf');
     toast(target.kind === 'download'
-      ? `PDF salvo com ${S.annots.length} comentário(s): ${name} (pasta Downloads)`
-      : `${S.annots.length} comentário(s) gravado(s) dentro de ${name}.`);
+      ? `PDF salvo com ${n} comentário(s): ${name} (pasta Downloads)`
+      : `${n} comentário(s) gravado(s) dentro de ${name}.`);
     return true;
   } catch (e) {
     console.error(e);
     toast('Erro ao salvar o PDF: ' + e.message + '. O arquivo original não foi alterado.', true);
     return false;
   } finally {
+    S.saving = false;
+    savingUI(false);
     progress(null);
-    loadingBox(null);
+  }
+}
+
+// Botões de Salvar PDF enquanto a gravação em segundo plano acontece
+function savingUI(on) {
+  for (const id of ['#save-pdf', '#ed-save']) {
+    const b = $(id);
+    if (!b.dataset.label) b.dataset.label = b.textContent;
+    b.textContent = on ? 'Salvando PDF…' : b.dataset.label;
+    b.classList.toggle('saving', on);
+    b.disabled = on || !S.pdf;
+  }
+}
+
+// ---- pdf-lib em segundo plano (Web Worker), com o mesmo código na tela como reserva ----
+let pdfWorker = null, pdfWorkSeq = 0;
+const pdfWorkWait = new Map();
+function pdfWork(op, data, transfer = []) {
+  if (pdfWorker === null) {
+    try {
+      const src = document.getElementById('pdf-worker-src')?.textContent;
+      if (!src) throw new Error('sem worker');
+      pdfWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      pdfWorker.onmessage = (e) => {
+        const w = pdfWorkWait.get(e.data.id);
+        if (!w) return;
+        pdfWorkWait.delete(e.data.id);
+        if (e.data.ok) w.res(e.data); else w.rej(new Error(e.data.error));
+      };
+      pdfWorker.onerror = (e) => {
+        console.warn('Worker do PDF indisponível', e.message);
+        pdfWorker = false;
+        for (const w of pdfWorkWait.values()) w.rej(Object.assign(new Error('worker'), { workerFailed: true }));
+        pdfWorkWait.clear();
+      };
+    } catch { pdfWorker = false; }
+  }
+  if (!pdfWorker) return Promise.reject(Object.assign(new Error('worker'), { workerFailed: true }));
+  const id = ++pdfWorkSeq;
+  return new Promise((res, rej) => {
+    pdfWorker.postMessage({ id, op, ...data }, transfer); // pode falhar (DataCloneError) antes de registrar
+    pdfWorkWait.set(id, { res, rej });
+  });
+}
+async function pdfRead(buf, doc) {
+  try {
+    const copy = buf.slice();
+    return await pdfWork('read', { bytes: copy, doc }, [copy.buffer]);
+  } catch (e) {
+    if (!e.workerFailed) throw e;
+    const doc = await loadPdfLib(buf.slice());
+    const annots = readAnnotations(doc);
+    const trailerId = getTrailerId(doc);
+    let display = null;
+    if (annots.length) {
+      stripAnnotations(doc);
+      display = await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
+    }
+    return { annots, trailerId, display };
+  }
+}
+// Gera o PDF com os comentários e, se possível, grava-o no próprio worker.
+// Retorna { written: true } ou { written: false, out } (então a tela grava os bytes).
+async function pdfSave(target, annots) {
+  const wt = target.kind === 'handle' ? { kind: 'handle', handle: target.handle }
+    : target.kind === 'launcher' ? { kind: 'launcher', url: new URL('/save-initial?' + launcherQS(target.f), location.href).href }
+      : null;
+  try {
+    const send = (t, bytes) => pdfWork('save', { doc: S.docId, annots, target: t, bytes }, bytes ? [bytes.buffer] : []);
+    try {
+      return await send(wt);
+    } catch (e) {
+      if (e.name === 'DataCloneError') return await send(null); // destino que não pode ir ao worker
+      if (e.message === 'nobytes') return await send(wt, S.bytes.slice());
+      throw e;
+    }
+  } catch (e) {
+    if (!e.workerFailed) throw e;
+    const doc = await loadPdfLib(S.bytes.slice());
+    stripAnnotations(doc);
+    await writeAnnotations(doc, annots);
+    return { written: false, out: await doc.save({ useObjectStreams: false, updateFieldAppearances: false }) };
   }
 }
 
@@ -2747,7 +2916,7 @@ async function exportFdfFile() {
     const bytes = exportFDF(S.annots, { fileName: S.fileName, idHex: S.trailerId });
     await writeTarget(target, bytes, 'application/vnd.fdf');
     if (target.kind === 'handle') S.fdfHandle = target.handle;
-    syncSaved(sig);
+    syncSaved(sig, 'fdf');
     toast(`${S.annots.length} comentário(s) salvo(s) em ${target.kind === 'handle' ? target.handle.name : target.name}`);
     return true;
   } catch (e) {
@@ -2774,6 +2943,7 @@ async function importFdfFile(file) {
       if (!mode || mode === 'cancel') return;
     }
     snapshot();
+    const hadOwn = mode === 'merge' && S.annots.length > 0;
     if (mode === 'replace') S.annots = [];
     const byName = new Map(S.annots.map((a, k) => [a.name, k]));
     let replaced = 0;
@@ -2781,7 +2951,8 @@ async function importFdfFile(file) {
       if (byName.has(a.name)) { S.annots[byName.get(a.name)] = a; replaced++; } else S.annots.push(a);
     }
     S.groups = rebuildGroups(S.annots, mode === 'replace' ? [] : S.groups);
-    setDirty(true);
+    // os comentários vieram do FDF: falta gravar no PDF; o FDF só muda se houve mescla com outros
+    setDirty(true, hadOwn ? 'both' : 'pdf');
     refreshAll();
     let msg = `${ok.length} comentário(s) importado(s)` + (replaced ? ` (${replaced} atualizados)` : '') + '.';
     if (skipped) msg += ` ${skipped} ignorado(s): página inexistente.`;
@@ -2841,7 +3012,7 @@ window.addEventListener('drop', (e) => {
 });
 
 window.addEventListener('beforeunload', (e) => {
-  if (S.dirty) { e.preventDefault(); e.returnValue = ''; }
+  if (S.dirty || S.saving) { e.preventDefault(); e.returnValue = ''; }
 });
 
 let resizeTimer;
@@ -2890,6 +3061,12 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (E.open) {
+    // Alt+← / Alt+→: página visualizada antes / depois (histórico de páginas, como no navegador)
+    if (e.altKey && !mod && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      histStep(e.key === 'ArrowLeft' ? -1 : 1);
+      return;
+    }
     if (e.key === 'PageDown' || (e.key === 'ArrowRight' && !mod)) { e.preventDefault(); gotoEditorPage(navBase() + 1); return; }
     if (e.key === '0' && !mod) { e.preventDefault(); fitWholePage(); return; }
     if (e.key === 'PageUp' || (e.key === 'ArrowLeft' && !mod)) { e.preventDefault(); gotoEditorPage(navBase() - 1); return; }
@@ -2996,10 +3173,10 @@ function syncLeave() {
   SYNC.base = new Map();
 }
 // Depois de salvar: marca como salvo aqui e nas outras janelas (se nada mudou durante a gravação)
-function syncSaved(sig) {
-  if (stateSig() === sig) setDirty(false);
+function syncSaved(sig, which) {
+  if (stateSig() === sig) setDirty(false, which);
   syncPublish();
-  syncPost({ type: 'saved', sig });
+  syncPost({ type: 'saved', sig, which });
 }
 function syncApply(fn) {
   SYNC.applying = true;
@@ -3026,7 +3203,7 @@ SYNC.ch?.addEventListener('message', (e) => {
   if (m.type === 'hello') {
     if (SYNC.joining) return;
     syncPublish();
-    syncPost({ type: 'state', to: m.from, annots: S.annots, groups: S.groups, dirty: S.dirty });
+    syncPost({ type: 'state', to: m.from, annots: S.annots, groups: S.groups, dirtyPdf: !!S.dirtyPdf, dirtyFdf: !!S.dirtyFdf });
   } else if (m.type === 'state') {
     if (m.to !== SYNC.win || !SYNC.joining) return;
     SYNC.joining = false;
@@ -3036,7 +3213,9 @@ SYNC.ch?.addEventListener('message', (e) => {
       S.undo = [];
       S.redo = [];
       syncBaseline();
-      setDirty(!!m.dirty);
+      setDirty(false);
+      if (m.dirtyPdf) setDirty(true, 'pdf');
+      if (m.dirtyFdf) setDirty(true, 'fdf');
       syncAfterRemote();
     });
     toast('Este processo também está aberto em outra janela: os comentários das duas ficam sincronizados.', false, 6000);
@@ -3067,7 +3246,7 @@ SYNC.ch?.addEventListener('message', (e) => {
       syncAfterRemote();
     });
   } else if (m.type === 'saved') {
-    if (!SYNC.timer && stateSig() === m.sig) setDirty(false);
+    if (!SYNC.timer && stateSig() === m.sig) setDirty(false, m.which || 'both');
   }
 });
 
@@ -3085,7 +3264,7 @@ async function openNewWindow() {
   if (/^https?:$/.test(location.protocol) && q.get('t')) {
     // pelo YayNotes.exe: abre uma janela própria do app
     try {
-      const r = await fetch(`/open?${launcherQS()}&w=${w}`, { method: 'POST', body: '' });
+      const r = await fetch(`/open?${launcherQS(S.target?.kind === 'launcher' ? S.target.f : null)}&w=${w}`, { method: 'POST', body: '' });
       if (r.ok) { toast('Abrindo nova janela…', false, 2500); return; }
     } catch { /* tenta pelo navegador */ }
   }

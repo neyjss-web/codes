@@ -52,12 +52,13 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Página nítida | A página é desenhada com exatamente os pixels da tela e alinhada a eles, em qualquer escala do Windows (100%, 125%, 150%, 250%…). Assim a imagem não é esticada nem fica meio pixel deslocada, o que a deixava embaçada. |
 | Troca de página sem "piscar" | A página nova é desenhada fora da tela e só aparece pronta. Se ainda não estiver pronta, a página atual continua visível até ela ficar pronta (no máximo 6 s), com o aviso "Carregando página…" se demorar. Enquanto você lê, o app já desenha a próxima, a seguinte e a anterior. O desenho usa a placa de vídeo, o que deixa as páginas digitalizadas (imagens pesadas) prontas mais rápido e sem travar a tela. Quando a próxima página tem outro tamanho (comum em páginas digitalizadas), ela é desenhada antes, fora da tela, e a troca só acontece com ela pronta: a tela não fica branca. Num reajuste de zoom, as páginas já desenhadas continuam na tela até a nova versão ficar pronta. A página de destino é sempre desenhada primeiro. |
 | Ir direto para uma página | Digite o número no campo da página (ao lado de ▲ ▼) e tecle `Enter`. |
+| Voltar e avançar pelas páginas já vistas | `Alt+←` volta para a página vista antes, `Alt+→` avança de novo, como no navegador. Entram no histórico as páginas em que você parou (por meio segundo ou mais) e as de onde saltou (links, comentários, busca, marcadores). |
 | Botão "Página inteira" (no lugar de "Largura") | Botão **Página inteira** (ou tecla `0`). |
 | Ver o texto do PDF | O texto pode ser selecionado e copiado. O botão **Copiar texto** copia a página atual. |
 | Copiar o "Num." do PJe | **Copiar Num.** copia, por exemplo, `2177293507 - Pág. 1`, lido do rodapé da página. |
 | Links do PDF funcionando | Links internos (índices) saltam para a página. Links externos abrem no navegador. |
 | Salvar e carregar sem voltar à tela inicial | Botões **Carregar FDF**, **Salvar FDF** e **Salvar PDF**. |
-| Saber quando é preciso salvar | Havendo alteração não salva, **Salvar PDF** e **Salvar FDF** ficam em destaque (amarelo, com um ●), nas miniaturas e na visão de página. |
+| Saber quando é preciso salvar | **Salvar PDF** e **Salvar FDF** ficam em destaque (vermelho claro, com um ●) **cada um por si**, porque são dois arquivos: salvar o FDF apaga só o destaque do FDF, e vice-versa. Uma alteração nos comentários acende os dois. Ao abrir um PDF cujos comentários foram revisados (vínculo ao Num.), só o PDF fica pendente. |
 
 ### 2.3 Painel lateral
 
@@ -71,6 +72,7 @@ acompanhamento do processo ao longo do tempo é feito pelo FDF.
 | Pedido | Como ficou |
 |---|---|
 | Passar para a próxima ocorrência | Mostra "3 de 12 · p. 875". Use ▲ ▼, `Enter` e `Shift+Enter`, ou `F3` e `Shift+F3`. Na visão de página, a palavra encontrada fica destacada em laranja. |
+| Buscar o "Num." copiado | Ao lado da busca há uma caixa **Num. …**. Ao copiar um texto curto (menos de 15 caracteres) que começa por números, como o ID de um documento no PJe, ela mostra "Num. 2136402905". `Enter` busca, e `Enter` de novo vai para a próxima ocorrência. A caixa de busca normal não muda. Na primeira vez, o Edge pergunta se o app pode ler a área de transferência. |
 | Continuar a busca a partir de onde estou | Nas miniaturas, ao clicar numa página, a próxima ocorrência (ou a anterior) é procurada a partir dela. Na visão de página, a partir da página atual. Uma busca nova também começa nesse ponto. |
 
 ## 3. Comentários
@@ -106,6 +108,9 @@ PDF mais novo, o YayNotes procura a página com o mesmo Num./Pág. e coloca o co
 | Salvar o PDF com os comentários **dentro do mesmo arquivo** | **Salvar PDF** grava no próprio arquivo aberto, inclusive quando o PDF é arrastado sobre o `YayNotes.exe`. **Salvar como…** grava em outro arquivo. A gravação é segura: se algo falhar no meio, o arquivo original não é alterado. |
 | Não usar o painel de downloads do navegador | O painel tinha opções perigosas, como desfazer e lixeira, e um arquivo foi perdido por acidente. Agora o PDF é gravado direto no arquivo, e o FDF pela janela "Salvar como" do Windows, que já abre na pasta do PDF. O painel não aparece mais. O Edge pede, uma vez, permissão para o app editar o arquivo. |
 | Duas janelas do mesmo processo, alterando e salvando em qualquer uma | Botão **⧉ Nova janela** (na tela de miniaturas) ou **⧉** (na visão de página): abre outra janela com o mesmo processo, na mesma página, já com os comentários ainda não salvos. Também dá para abrir o `YayNotes.exe` de novo e abrir o mesmo PDF. Com o mesmo PDF aberto nas duas, os comentários ficam **sincronizados**: o que é criado, alterado, excluído, desfeito ou importado de um FDF numa janela aparece na outra em instantes. Salvar o PDF ou o FDF em qualquer janela grava os comentários das duas, e ambas passam a indicar "salvo". `Ctrl+Z` desfaz a última ação da própria janela. Janelas com PDFs diferentes não se misturam. |
+| Carregar e salvar em segundo plano | A leitura e a gravação dos comentários no PDF acontecem numa linha de execução separada: ao salvar, a tela continua livre para ler e comentar (o botão mostra "Salvando PDF…"). O que for alterado durante a gravação continua marcado como não salvo. Abrir ficou bem mais rápido em processos grandes. |
+| Salvar sem a pergunta "Salvar alterações?" | A pergunta é do Edge: por segurança, ele confirma uma vez antes de deixar uma página gravar num arquivo aberto por ela. No `YayNotes.exe`, **Abrir PDF** usa agora a janela "Abrir" do próprio Windows, e a gravação é feita pelo programa, sem a pergunta. (Ela ainda aparece no `YayNotes.html` aberto direto no navegador, ou se o PDF for arrastado para dentro da janela.) |
+| Abrir maximizado | O `YayNotes.exe` abre a janela maximizada. |
 | Rodar em qualquer Windows | O `.exe` é de 32 bits e funciona do Windows 7 ao 11, em 32 ou 64 bits. |
 
 ## 6. Limites conhecidos

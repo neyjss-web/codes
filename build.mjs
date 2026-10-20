@@ -24,6 +24,18 @@ async function run() {
     logLevel: 'warning',
   });
   const code = js.outputFiles[0].text.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
+  // Worker do pdf-lib (leitura e gravação dos comentários em segundo plano), como script clássico
+  const wk = await build({
+    entryPoints: [join(root, 'src', 'pdfworker.js')],
+    bundle: true,
+    format: 'iife',
+    minify: true,
+    write: false,
+    target: ['chrome110', 'firefox115', 'safari16.4', 'edge110'],
+    legalComments: 'none',
+    logLevel: 'warning',
+  });
+  const workerCode = wk.outputFiles[0].text.replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
   const css = readFileSync(join(root, 'src', 'styles.css'), 'utf8');
 
   // Worker do pdf.js + dados binários (fontes padrão e decodificadores WASM de JBIG2/JPEG2000/cores)
@@ -50,7 +62,8 @@ async function run() {
   html = html.replaceAll('__VERSION__', `${stamp}-${hash}`);
   html = html.replace('/*__CSS__*/', () => css);
   html = html.replace('<script type="module">/*__JS__*/</script>', () =>
-    `<script type="application/json" id="pdfjs-assets">${JSON.stringify(assets)}</script>\n<script type="module">${code}</script>`);
+    `<script type="application/json" id="pdfjs-assets">${JSON.stringify(assets)}</script>\n` +
+    `<script type="text/js-worker" id="pdf-worker-src">${workerCode}</script>\n<script type="module">${code}</script>`);
   mkdirSync(dirname(outFile), { recursive: true });
   writeFileSync(outFile, html);
   console.log(`Gerado ${outFile} (${(html.length / 1048576).toFixed(1)} MB)`);

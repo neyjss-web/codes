@@ -44,7 +44,7 @@ await page.keyboard.type('Gravada no próprio arquivo');
 await page.keyboard.press('Escape');
 // Salvar PDF (visão de página)
 await page.click('#ed-save');
-await page.waitForFunction(() => document.querySelector('#loading').hidden && !window.__yaynotes.S.dirty, null, { timeout: 30000 });
+await page.waitForFunction(() => document.querySelector('#loading').hidden && !window.__yaynotes.S.dirtyPdf && !window.__yaynotes.S.saving, null, { timeout: 30000 });
 const saved = Buffer.from(await page.evaluate(() => Array.from(window.__files['exemplo.pdf'])));
 const annots = readAnnotations(await loadPdfLib(saved));
 const nota = annots.find((a) => a.contents === 'Gravada no próprio arquivo');

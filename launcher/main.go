@@ -77,7 +77,7 @@ func main() {
 	}
 	token := randomToken()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := listenLocal()
 	if err != nil {
 		fail("Não foi possível iniciar o servidor local: " + err.Error())
 	}
@@ -175,6 +175,36 @@ func main() {
 		openWindow(u)
 		w.WriteHeader(http.StatusNoContent)
 	})
+	// "Abrir PDF" no app: janela Abrir do Windows. O arquivo escolhido fica registrado (X-File-Id)
+	// e pode ser gravado depois por /save-initial, sem a confirmação do Edge.
+	mux.HandleFunc("/pick-open", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Query().Get("t") != token {
+			http.Error(w, "não permitido", http.StatusForbidden)
+			return
+		}
+		if !dialogSupported {
+			http.Error(w, "indisponível", http.StatusNotImplemented)
+			return
+		}
+		path, err := pickOpenFile("Abrir PDF — YayNotes")
+		if err == errCanceled {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotImplemented)
+			return
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-File-Name", url.PathEscape(filepath.Base(path)))
+		w.Header().Set("X-File-Id", register(path))
+		w.Write(data)
+	})
 	// Sinal de vida enviado pela página: o programa encerra quando a janela é fechada
 	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
 		lastPing.Store(time.Now().Unix())
@@ -214,6 +244,17 @@ func openWindow(u string) {
 	} else {
 		openDefaultBrowser(u)
 	}
+}
+
+// Endereço fixo (o primeiro livre de uma pequena faixa): assim o Edge lembra, de uma vez para outra,
+// as permissões dadas ao app (área de transferência) e as preferências (nome do autor, tamanhos).
+func listenLocal() (net.Listener, error) {
+	for port := 47391; port < 47401; port++ {
+		if ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port)); err == nil {
+			return ln, nil
+		}
+	}
+	return net.Listen("tcp", "127.0.0.1:0")
 }
 
 // Arquivo com o endereço da instância em execução (só o usuário do Windows tem acesso à pasta)
@@ -281,7 +322,7 @@ func startAppWindow(appURL string) *exec.Cmd {
 			"--user-data-dir="+profile,
 			"--no-first-run",
 			"--no-default-browser-check",
-			"--window-size=1400,900",
+			"--start-maximized",
 		)
 		if err := cmd.Start(); err == nil {
 			return cmd

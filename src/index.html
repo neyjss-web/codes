@@ -37,6 +37,10 @@
     <button class="btn icon" id="search-next" disabled title="Próxima ocorrência (F3)">▼</button>
     <span id="search-info"></span>
   </div>
+  <div class="tb-group search num-search">
+    <input type="search" id="num-search" class="num-box" placeholder="Num. …" disabled title="Busca pelo Num. do PJe. Ao copiar um número (ex.: 2136402905), ele aparece aqui como “Num. 2136402905”. Enter busca; Enter de novo vai para a próxima ocorrência.">
+    <span id="num-search-info" class="num-info"></span>
+  </div>
   <div class="tb-group grow"></div>
   <div class="tb-group">
     <label class="chk" title="Ampliar a página sob o cursor (tecla L)"><input type="checkbox" id="hover-zoom" checked> Lupa</label>
@@ -132,6 +136,10 @@
         <button class="btn icon" id="ed-search-prev" disabled title="Ocorrência anterior (Shift+F3)">▲</button>
         <button class="btn icon" id="ed-search-next" disabled title="Próxima ocorrência (F3)">▼</button>
         <span id="ed-search-info"></span>
+      </span>
+      <span class="ed-search num-search">
+        <input type="search" id="ed-num-search" class="num-box" placeholder="Num. …" title="Busca pelo Num. do PJe. Ao copiar um número (ex.: 2136402905), ele aparece aqui como “Num. 2136402905”. Enter busca; Enter de novo vai para a próxima ocorrência.">
+        <span id="ed-num-search-info" class="num-info"></span>
       </span>
       <span class="grow"></span>
       <label class="btn" id="ed-import-fdf-btn" title="Carregar comentários de um arquivo FDF">Carregar FDF<input type="file" id="ed-import-fdf" accept=".fdf,application/vnd.fdf" hidden></label>
@@ -230,6 +238,7 @@
       <tr><td><kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd></td><td>Girar a visualização das páginas 90° à direita / à esquerda</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Buscar no texto</td></tr>
       <tr><td><kbd>F3</kbd> / <kbd>Shift</kbd>+<kbd>F3</kbd></td><td>Próxima / anterior ocorrência da busca (ou Enter / Shift+Enter no campo de busca)</td></tr>
+      <tr><td>Caixa “Num. …”</td><td>Ao copiar um número curto (ex.: o ID de um documento no PJe), ele aparece como “Num. 2136402905”; Enter busca</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Desfazer / refazer</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Gravar os comentários no PDF aberto / Salvar como outro arquivo</td></tr>
       <tr><td>⧉ Nova janela</td><td>Abre o mesmo processo em outra janela; os comentários das duas ficam sincronizados e dá para salvar em qualquer uma</td></tr>
@@ -237,6 +246,8 @@
       <tr><td><kbd>V</kbd> <kbd>N</kbd> <kbd>T</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>K</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>D</kbd></td><td>Selecionar, Nota, Texto, Realçar, Sublinhar, Tachar, Retângulo, Elipse, Desenho</td></tr>
       <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd> ou <kbd>←</kbd> / <kbd>→</kbd></td><td>Página anterior / próxima</td></tr>
       <tr><td><kbd>0</kbd></td><td>Página inteira na tela</td></tr>
+      <tr><td><kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>Alt</kbd>+<kbd>→</kbd></td><td>Volta / avança pelas páginas visualizadas antes (histórico, como no navegador)</td></tr>
+      <tr><td>Campo da página</td><td>Digite o número da página e tecle Enter</td></tr>
       <tr><td>Clique duplo no comentário</td><td>Abre a edição do texto do comentário</td></tr>
       <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd></td><td>No texto do comentário: negrito / vermelho</td></tr>
       <tr><td><kbd>Del</kbd></td><td>Exclui o comentário selecionado</td></tr>
